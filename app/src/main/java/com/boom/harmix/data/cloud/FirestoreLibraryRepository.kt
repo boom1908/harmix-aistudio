@@ -19,7 +19,7 @@ import javax.inject.Singleton
 
 @Singleton
 class FirestoreLibraryRepository @Inject constructor() {
-    private val firestore = FirebaseFirestore.getInstance()
+    private val firestore by lazy { FirebaseFirestore.getInstance() }
 
     fun getSavedSongs(uid: String): Flow<List<StreamItem>> =
         combine(getLikedSongs(uid), getPlaylists(uid)) { liked, playlists ->

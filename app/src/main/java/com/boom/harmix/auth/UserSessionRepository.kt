@@ -49,38 +49,54 @@ sealed class UsernameSaveResult {
  */
 @Singleton
 class UserSessionRepository @Inject constructor() {
-    private val auth = FirebaseAuth.getInstance()
-    private val firestore = FirebaseFirestore.getInstance()
+    private val auth by lazy { runCatching { FirebaseAuth.getInstance() }.getOrNull() }
+    private val firestore by lazy { runCatching { FirebaseFirestore.getInstance() }.getOrNull() }
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     private val _session = MutableStateFlow<UserSession>(UserSession.Loading)
     val session: StateFlow<UserSession> = _session.asStateFlow()
 
     init {
-        auth.addAuthStateListener { firebaseAuth ->
-            scope.launch { resolve(firebaseAuth.currentUser) }
+        val currentAuth = auth
+        if (currentAuth != null) {
+            runCatching {
+                currentAuth.addAuthStateListener { firebaseAuth ->
+                    scope.launch { resolve(firebaseAuth.currentUser) }
+                }
+            }.onFailure {
+                _session.value = UserSession.Guest
+            }
+        } else {
+            _session.value = UserSession.Guest
         }
     }
 
     fun refresh() {
-        scope.launch { resolve(auth.currentUser) }
+        val currentAuth = auth
+        if (currentAuth != null) {
+            scope.launch { resolve(currentAuth.currentUser) }
+        } else {
+            _session.value = UserSession.Guest
+        }
     }
 
     suspend fun saveUsername(chosenName: String): UsernameSaveResult {
-        val user = auth.currentUser
+        val currentAuth = auth ?: return UsernameSaveResult.Failure("Sign in service is temporarily unavailable.")
+        val currentFirestore = firestore ?: return UsernameSaveResult.Failure("Database service is temporarily unavailable.")
+        val user = currentAuth.currentUser
             ?: return UsernameSaveResult.Failure("Sign in before choosing a username.")
         val username = chosenName
 
         return withContext(Dispatchers.IO) {
             try {
-                val profileRef = firestore.collection("users").document(user.uid)
-                val usernameRef = firestore.collection("usernames").document(username)
-                val task = firestore.runTransaction { transaction ->
+                val profileRef = currentFirestore.collection("users").document(user.uid)
+                val usernameRef = currentFirestore.collection("usernames").document(username)
+                val task = currentFirestore.runTransaction { transaction ->
                     val profileSnapshot = transaction.get(profileRef)
                     val newUsernameSnapshot = transaction.get(usernameRef)
                     val oldUsername = profileSnapshot.getString("username")
                     val oldUsernameSnapshot = if (!oldUsername.isNullOrBlank() && oldUsername != username) {
-                        transaction.get(firestore.collection("usernames").document(oldUsername))
+                        transaction.get(currentFirestore.collection("usernames").document(oldUsername))
                     } else {
                         null
                     }
@@ -133,11 +149,19 @@ class UserSessionRepository @Inject constructor() {
             _session.value = UserSession.Guest
             return
         }
-        if (auth.currentUser?.uid != user.uid) return
+        val currentAuth = auth ?: run {
+            _session.value = UserSession.Guest
+            return
+        }
+        val currentFirestore = firestore ?: run {
+            _session.value = UserSession.Guest
+            return
+        }
+        if (currentAuth.currentUser?.uid != user.uid) return
 
         try {
-            val profile = firestore.collection("users").document(user.uid).get().await()
-            if (auth.currentUser?.uid != user.uid) return
+            val profile = currentFirestore.collection("users").document(user.uid).get().await()
+            if (currentAuth.currentUser?.uid != user.uid) return
             val username = profile.getString("username").orEmpty()
             if (username.isBlank()) {
                 _session.value = UserSession.NeedsUsername(

@@ -70,7 +70,7 @@ class GoogleAccountsRepository @Inject constructor(
 ) {
 
     private val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-    private val firebaseAuth = FirebaseAuth.getInstance()
+    private val firebaseAuth by lazy { runCatching { FirebaseAuth.getInstance() }.getOrNull() }
 
     private val _mainAccount = MutableStateFlow(readMainAccount())
     val mainAccount: StateFlow<GoogleAccountInfo?> = _mainAccount.asStateFlow()
@@ -82,7 +82,7 @@ class GoogleAccountsRepository @Inject constructor(
     val authError: StateFlow<String?> = _authError.asStateFlow()
 
     init {
-        firebaseAuth.addAuthStateListener {
+        firebaseAuth?.addAuthStateListener {
             _mainAccount.value = readMainAccount()
         }
     }
@@ -110,9 +110,14 @@ class GoogleAccountsRepository @Inject constructor(
                 _authError.value = "Google didn't return an ID token. Check Firebase Google Sign-In setup."
                 return null
             }
+            val auth = firebaseAuth
+            if (auth == null) {
+                _authError.value = "Firebase Authentication is not available."
+                return null
+            }
             try {
                 withContext(Dispatchers.IO) {
-                    firebaseAuth.signInWithCredential(
+                    auth.signInWithCredential(
                         GoogleAuthProvider.getCredential(idToken, null)
                     ).await()
                 }
@@ -137,7 +142,7 @@ class GoogleAccountsRepository @Inject constructor(
 
     fun signOut(slot: AccountSlot) {
         runCatching { clientFor(slot).signOut() }
-        if (slot == AccountSlot.MAIN) firebaseAuth.signOut()
+        if (slot == AccountSlot.MAIN) firebaseAuth?.signOut()
         write(slot, null)
     }
 
@@ -207,7 +212,7 @@ class GoogleAccountsRepository @Inject constructor(
     }
 
     private fun readMainAccount(): GoogleAccountInfo? {
-        val firebaseUser = firebaseAuth.currentUser ?: return null
+        val firebaseUser = firebaseAuth?.currentUser ?: return null
         val saved = read(AccountSlot.MAIN)
         return if (saved?.email == firebaseUser.email) {
             saved

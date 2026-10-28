@@ -32,7 +32,7 @@ class SearchHistoryStore @Inject constructor(
 ) {
     private val prefs: SharedPreferences =
         context.getSharedPreferences("harmix_search_history", Context.MODE_PRIVATE)
-    private val firestore = FirebaseFirestore.getInstance()
+    private val firestore by lazy { FirebaseFirestore.getInstance() }
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     private val _history = MutableStateFlow(read())

@@ -16,6 +16,11 @@ class HarmixApplication : Application() {
     override fun attachBaseContext(base: Context?) {
         super.attachBaseContext(base)
 
+        // Ensure Firebase is initialized as early as possible before any services or injection
+        if (base != null) {
+            com.boom.harmix.auth.FirebaseInitializer.init(base)
+        }
+
         // Install process-wide crash catcher as early as possible
         val defaultHandler = Thread.getDefaultUncaughtExceptionHandler()
         Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
@@ -55,6 +60,7 @@ class HarmixApplication : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        com.boom.harmix.auth.FirebaseInitializer.init(this)
 
         // Initialize Chaquopy asynchronously on a background worker thread.
         // On first run, extracting Python runtime, stdlib, yt-dlp, and wheels can take

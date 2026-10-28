@@ -21,7 +21,7 @@ data class ListeningHistoryEntry(
 
 @Singleton
 class ListeningHistoryRepository @Inject constructor() {
-    private val firestore = FirebaseFirestore.getInstance()
+    private val firestore by lazy { FirebaseFirestore.getInstance() }
 
     fun getRecentHistory(uid: String, limit: Long = 100): Flow<List<ListeningHistoryEntry>> =
         historyCollection(uid)

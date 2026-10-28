@@ -131,6 +131,7 @@ class MainActivity : ComponentActivity() {
     private var crashDialogContent by mutableStateOf<String?>(null)
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        com.boom.harmix.auth.FirebaseInitializer.init(this)
         super.onCreate(savedInstanceState)
 
         val crashPrefs = getSharedPreferences("harmix_crash", Context.MODE_PRIVATE)
