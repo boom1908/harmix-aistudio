@@ -58,5 +58,11 @@
                 android:resource="@xml/now_playing_widget_info" />
         </receiver>
 
+        <activity
+            android:name=".CrashReportActivity"
+            android:exported="false"
+            android:process=":crash_handler"
+            android:theme="@android:style/Theme.DeviceDefault.NoActionBar" />
+
     </application>
 </manifest>

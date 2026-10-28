@@ -16,6 +16,9 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
+import com.boom.harmix.HarmixApplication
+import kotlinx.coroutines.delay
+
 sealed class HomeUiState {
     data object Loading : HomeUiState()
     data class Success(
@@ -55,6 +58,18 @@ class HomeViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.value = HomeUiState.Loading
             try {
+                // Wait for the background Python engine initialization (up to 12s on cold install)
+                var elapsedMs = 0L
+                while (!HarmixApplication.isReady && HarmixApplication.startupError == null && elapsedMs < 12_000L) {
+                    delay(250)
+                    elapsedMs += 250
+                }
+
+                if (HarmixApplication.startupError != null) {
+                    _uiState.value = HomeUiState.Error("Audio engine alert: ${HarmixApplication.startupError}")
+                    return@launch
+                }
+
                 val trending = metadataRepository.getTrending()
                 val forYou = if (authenticated != null) {
                     loadForYou(authenticated.uid)
