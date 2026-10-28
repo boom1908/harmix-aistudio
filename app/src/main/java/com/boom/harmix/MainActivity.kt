@@ -158,6 +158,10 @@ class MainActivity : ComponentActivity() {
             )
         }
 
+        if (HarmixApplication.startupError != null) {
+            Toast.makeText(this, "Engine alert: ${HarmixApplication.startupError}", Toast.LENGTH_LONG).show()
+        }
+
         setContent {
             HarmixTheme {
                 Surface(color = MaterialTheme.colorScheme.background) {

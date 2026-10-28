@@ -24,15 +24,24 @@ private val DarkColorScheme = darkColorScheme(
     outline = GlassBorder
 )
 
+private tailrec fun android.content.Context.findActivity(): Activity? = when (this) {
+    is Activity -> this
+    is android.content.ContextWrapper -> baseContext.findActivity()
+    else -> null
+}
+
 @Composable
 fun HarmixTheme(content: @Composable () -> Unit) {
     val view = LocalView.current
     if (!view.isInEditMode) {
         SideEffect {
-            val window = (view.context as Activity).window
-            window.statusBarColor = PureBlack.toArgb()
-            window.navigationBarColor = PureBlack.toArgb()
-            WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = false
+            val activity = view.context.findActivity()
+            if (activity != null) {
+                val window = activity.window
+                window.statusBarColor = PureBlack.toArgb()
+                window.navigationBarColor = PureBlack.toArgb()
+                WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = false
+            }
         }
     }
 
