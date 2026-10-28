@@ -52,19 +52,18 @@ import com.boom.harmix.metadata.LyricsResult
 import com.boom.harmix.navigation.HarmixNavHost
 import com.boom.harmix.navigation.bottomNavItemsFor
 import com.boom.harmix.playback.QueueItemUi
+import androidx.compose.ui.graphics.Brush
 import com.boom.harmix.ui.components.Artwork
 import com.boom.harmix.ui.components.OfflineBanner
 import com.boom.harmix.ui.theme.Charcoal
+import com.boom.harmix.ui.theme.CharcoalSurface
 import com.boom.harmix.ui.theme.GlassBorder
+import com.boom.harmix.ui.theme.GlassCharcoal
 import com.boom.harmix.ui.theme.Ivory
 import com.boom.harmix.ui.theme.PureBlack
 import com.boom.harmix.ui.theme.Slate
 import com.boom.harmix.ui.theme.SoftGrey
 import com.boom.harmix.ui.viewmodel.NetworkViewModel
-import dev.chrisbanes.haze.HazeState
-import dev.chrisbanes.haze.HazeStyle
-import dev.chrisbanes.haze.haze
-import dev.chrisbanes.haze.hazeChild
 
 @Composable
 fun MainScreen(
@@ -138,7 +137,6 @@ fun MainScreen(
     var isFullPlayerExpanded by remember { mutableStateOf(false) }
     val networkViewModel: NetworkViewModel = hiltViewModel()
     val isOnline by networkViewModel.isOnline.collectAsState()
-    val hazeState = remember { HazeState() }
 
     BackHandler(enabled = isFullPlayerExpanded) {
         isFullPlayerExpanded = false
@@ -160,7 +158,6 @@ fun MainScreen(
                         .padding(bottom = 8.dp)
                 ) {
                     MiniPlayer(
-                        hazeState = hazeState,
                         songTitle = currentSongTitle,
                         artist = currentArtist,
                         artworkUrl = currentArtworkUrl,
@@ -170,7 +167,6 @@ fun MainScreen(
                         onExpandClick = { isFullPlayerExpanded = true }
                     )
                     HarmixBottomBar(
-                        hazeState = hazeState,
                         navController = navController,
                         isGuest = isGuest
                     )
@@ -192,9 +188,7 @@ fun MainScreen(
                 onToggleLike = onToggleLikeForItem,
                 onOpenSettings = { navController.navigate("settings") },
                 onOpenListeningHistory = { navController.navigate("listening-history") },
-                modifier = Modifier
-                    .haze(hazeState)
-                    .padding(innerPadding)
+                modifier = Modifier.padding(innerPadding)
             )
         }
 
@@ -255,7 +249,6 @@ fun MainScreen(
 
 @Composable
 private fun MiniPlayer(
-    hazeState: HazeState,
     songTitle: String,
     artist: String,
     artworkUrl: String?,
@@ -271,13 +264,13 @@ private fun MiniPlayer(
             .fillMaxWidth()
             .padding(horizontal = 14.dp, vertical = 4.dp)
             .height(68.dp)
-            .hazeChild(
-                state = hazeState,
-                shape = shape,
-                style = HazeStyle(
-                    tint = Charcoal.copy(alpha = 0.82f),
-                    blurRadius = 24.dp,
-                    noiseFactor = 0.05f
+            .clip(shape)
+            .background(
+                Brush.verticalGradient(
+                    listOf(
+                        Charcoal.copy(alpha = 0.92f),
+                        CharcoalSurface.copy(alpha = 0.96f)
+                    )
                 )
             )
             .border(1.dp, GlassBorder, shape)
@@ -334,7 +327,6 @@ private fun MiniPlayer(
 
 @Composable
 private fun HarmixBottomBar(
-    hazeState: HazeState,
     navController: androidx.navigation.NavHostController,
     isGuest: Boolean
 ) {
@@ -348,13 +340,13 @@ private fun HarmixBottomBar(
             .fillMaxWidth()
             .padding(horizontal = 14.dp, vertical = 4.dp)
             .height(66.dp)
-            .hazeChild(
-                state = hazeState,
-                shape = shape,
-                style = HazeStyle(
-                    tint = Charcoal.copy(alpha = 0.85f),
-                    blurRadius = 24.dp,
-                    noiseFactor = 0.05f
+            .clip(shape)
+            .background(
+                Brush.verticalGradient(
+                    listOf(
+                        Charcoal.copy(alpha = 0.94f),
+                        CharcoalSurface.copy(alpha = 0.98f)
+                    )
                 )
             )
             .border(1.dp, GlassBorder, shape)

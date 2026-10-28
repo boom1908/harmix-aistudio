@@ -170,10 +170,6 @@ dependencies {
   // Images
   implementation(libs.coil.compose)
 
-  // Glassmorphism
-  implementation("dev.chrisbanes.haze:haze:0.7.3")
-  implementation("dev.chrisbanes.haze:haze-materials:0.7.3")
-
   // Coroutines <-> Media3 ListenableFuture bridge
   implementation("org.jetbrains.kotlinx:kotlinx-coroutines-guava:1.8.1")
   implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.8.1")

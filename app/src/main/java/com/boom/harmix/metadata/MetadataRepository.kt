@@ -38,6 +38,7 @@ class MetadataRepository @Inject constructor(
     suspend fun getLyrics(title: String, artist: String, durationSeconds: Int = 0): LyricsResult =
         withContext(Dispatchers.IO) {
             if (!networkMonitor.isOnline()) return@withContext LyricsResult.NotFound
+            if (!Python.isStarted()) return@withContext LyricsResult.NotFound
             val python = Python.getInstance()
             val metadataModule = python.getModule("metadata_engine")
 
@@ -61,6 +62,9 @@ class MetadataRepository @Inject constructor(
     private suspend fun callPython(functionName: String, vararg args: Any): List<StreamItem> =
         withContext(Dispatchers.IO) {
             networkMonitor.requireOnline()
+            if (!Python.isStarted()) {
+                throw RuntimeException("Engine startup warning: Python runtime is not ready.")
+            }
             val python = Python.getInstance()
             val metadataModule = python.getModule("metadata_engine")
 

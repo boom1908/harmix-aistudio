@@ -1,6 +1,9 @@
 package com.boom.harmix
 
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.ComponentName
+import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
@@ -9,12 +12,20 @@ import android.util.Log
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.lifecycleScope
 import androidx.glance.appwidget.updateAll
 import androidx.media3.common.C
@@ -117,8 +128,20 @@ class MainActivity : ComponentActivity() {
     private var personalizedQueueLoaded = false
     private var personalizedQueueFailures = 0
 
+    private var crashDialogContent by mutableStateOf<String?>(null)
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        val crashPrefs = getSharedPreferences("harmix_crash", Context.MODE_PRIVATE)
+        val savedCrash = crashPrefs.getString("last_crash", null)
+        if (!savedCrash.isNullOrBlank()) {
+            crashDialogContent = savedCrash
+            crashPrefs.edit().remove("last_crash").apply()
+        } else if (HarmixApplication.startupError != null) {
+            crashDialogContent = "Python Engine Error: ${HarmixApplication.startupError}"
+        }
+
         lastPlayedStore.read()?.let { lastPlayed ->
             currentSongTitle = lastPlayed.title
             currentArtist = lastPlayed.artist
@@ -156,10 +179,6 @@ class MainActivity : ComponentActivity() {
                 },
                 MoreExecutors.directExecutor()
             )
-        }
-
-        if (HarmixApplication.startupError != null) {
-            Toast.makeText(this, "Engine alert: ${HarmixApplication.startupError}", Toast.LENGTH_LONG).show()
         }
 
         setContent {
@@ -215,6 +234,37 @@ class MainActivity : ComponentActivity() {
                         sleepTimerRemainingMs = sleepTimerRemainingMs,
                         onCancelSleepTimer = ::cancelSleepTimer
                     )
+
+                    crashDialogContent?.let { crashText ->
+                        AlertDialog(
+                            onDismissRequest = { crashDialogContent = null },
+                            title = { Text("Diagnostic Notice") },
+                            text = {
+                                Text(
+                                    text = crashText,
+                                    modifier = Modifier.heightIn(max = 280.dp).verticalScroll(rememberScrollState()),
+                                    style = MaterialTheme.typography.bodySmall
+                                )
+                            },
+                            confirmButton = {
+                                TextButton(
+                                    onClick = {
+                                        val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
+                                        clipboard?.setPrimaryClip(ClipData.newPlainText("Harmix Crash Log", crashText))
+                                        Toast.makeText(this@MainActivity, "Copied log to clipboard", Toast.LENGTH_SHORT).show()
+                                        crashDialogContent = null
+                                    }
+                                ) {
+                                    Text("Copy Log")
+                                }
+                            },
+                            dismissButton = {
+                                TextButton(onClick = { crashDialogContent = null }) {
+                                    Text("Dismiss")
+                                }
+                            }
+                        )
+                    }
                 }
             }
         }

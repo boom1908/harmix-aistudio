@@ -71,18 +71,9 @@ jobs:
             exit 1
           fi
 
-      - name: Upload Debug APK Artifact (Optional)
-        uses: actions/upload-artifact@v4
-        continue-on-error: true
-        with:
-          name: harmix-debug-apk
-          path: app/build/outputs/apk/debug/*.apk
-          retention-days: 1
-          if-no-files-found: warn
-
       - name: Publish to GitHub Releases (APK & ZIP)
         uses: softprops/action-gh-release@v2
-        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/')
+        if: github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/')
         continue-on-error: true
         with:
           tag_name: v0.1.${{ github.run_number }}
@@ -93,7 +84,7 @@ jobs:
             - **Branch**: `${{ github.ref_name }}`
 
             #### Downloads:
-            - **harmix-debug.zip** — Compressed ZIP containing the APK (bypasses browser throttling and downloads faster)
+            - **harmix-debug.zip** — Compressed ZIP containing the APK (fast download)
             - **harmix-debug.apk** — Direct APK installer
           files: |
             release-assets/harmix-debug.zip
@@ -103,3 +94,12 @@ jobs:
           make_latest: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload Debug APK Artifact (Optional)
+        uses: actions/upload-artifact@v4
+        continue-on-error: true
+        with:
+          name: harmix-debug-apk
+          path: app/build/outputs/apk/debug/*.apk
+          retention-days: 1
+          if-no-files-found: warn
