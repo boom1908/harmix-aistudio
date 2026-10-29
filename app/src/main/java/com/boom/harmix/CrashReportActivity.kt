@@ -40,7 +40,7 @@ class CrashReportActivity : Activity() {
         val title = TextView(this).apply {
             text = "Harmix Crash Report"
             textSize = 22f
-            setTextColor(0xFFFAF7F0.toInt())
+            setTextColor(0xFFFFFFE3.toInt())
             setPadding(0, 0, 0, 16)
         }
         root.addView(title)
@@ -55,7 +55,7 @@ class CrashReportActivity : Activity() {
 
         val copyButton = Button(this).apply {
             text = "Copy Error Log"
-            setBackgroundColor(0xFFFAF7F0.toInt())
+            setBackgroundColor(0xFFFFFFE3.toInt())
             setTextColor(0xFF111111.toInt())
             setOnClickListener {
                 val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
@@ -89,7 +89,7 @@ class CrashReportActivity : Activity() {
         val restartButton = Button(this).apply {
             text = "Restart Harmix"
             setBackgroundColor(0xFF292929.toInt())
-            setTextColor(0xFFFAF7F0.toInt())
+            setTextColor(0xFFFFFFE3.toInt())
             setOnClickListener {
                 val launchIntent = packageManager.getLaunchIntentForPackage(packageName)
                 launchIntent?.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
