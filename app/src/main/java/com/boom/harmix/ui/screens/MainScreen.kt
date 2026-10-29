@@ -52,6 +52,7 @@ import com.boom.harmix.metadata.LyricsResult
 import com.boom.harmix.navigation.HarmixNavHost
 import com.boom.harmix.navigation.bottomNavItemsFor
 import com.boom.harmix.playback.QueueItemUi
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.ui.graphics.Brush
 import com.boom.harmix.ui.components.Artwork
 import com.boom.harmix.ui.components.OfflineBanner
@@ -59,6 +60,9 @@ import com.boom.harmix.ui.theme.Charcoal
 import com.boom.harmix.ui.theme.CharcoalSurface
 import com.boom.harmix.ui.theme.GlassBorder
 import com.boom.harmix.ui.theme.GlassCharcoal
+import com.boom.harmix.ui.theme.GlassFill
+import com.boom.harmix.ui.theme.GlassFloatingBarBrush
+import com.boom.harmix.ui.theme.GlassSpecularBorder
 import com.boom.harmix.ui.theme.Ivory
 import com.boom.harmix.ui.theme.PureBlack
 import com.boom.harmix.ui.theme.Slate
@@ -265,15 +269,8 @@ private fun MiniPlayer(
             .padding(horizontal = 14.dp, vertical = 4.dp)
             .height(68.dp)
             .clip(shape)
-            .background(
-                Brush.verticalGradient(
-                    listOf(
-                        Charcoal.copy(alpha = 0.92f),
-                        CharcoalSurface.copy(alpha = 0.96f)
-                    )
-                )
-            )
-            .border(1.dp, GlassBorder, shape)
+            .background(GlassFloatingBarBrush)
+            .border(BorderStroke(1.dp, GlassSpecularBorder), shape)
             .clickable(onClick = onExpandClick)
             .padding(horizontal = 12.dp),
         verticalAlignment = Alignment.CenterVertically
@@ -341,15 +338,8 @@ private fun HarmixBottomBar(
             .padding(horizontal = 14.dp, vertical = 4.dp)
             .height(66.dp)
             .clip(shape)
-            .background(
-                Brush.verticalGradient(
-                    listOf(
-                        Charcoal.copy(alpha = 0.94f),
-                        CharcoalSurface.copy(alpha = 0.98f)
-                    )
-                )
-            )
-            .border(1.dp, GlassBorder, shape)
+            .background(GlassFloatingBarBrush)
+            .border(BorderStroke(1.dp, GlassSpecularBorder), shape)
             .padding(horizontal = 6.dp, vertical = 6.dp),
         horizontalArrangement = Arrangement.SpaceEvenly,
         verticalAlignment = Alignment.CenterVertically

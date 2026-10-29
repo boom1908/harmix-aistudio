@@ -67,6 +67,8 @@ class AccountViewModel @Inject constructor(
 
     fun signInIntent(slot: AccountSlot): Intent = accounts.signInIntent(slot)
 
+    fun getAppCertificateSha1(): String = accounts.getAppCertificateSha1()
+
     fun onSignInResult(slot: AccountSlot, data: Intent?) {
         viewModelScope.launch {
             val info = accounts.handleSignInResult(slot, data)

@@ -48,9 +48,13 @@ import com.boom.harmix.R
 import com.boom.harmix.ui.theme.Charcoal
 import com.boom.harmix.ui.theme.CharcoalElevated
 import com.boom.harmix.ui.theme.GlassBorder
+import com.boom.harmix.ui.theme.GlassBorderBright
 import com.boom.harmix.ui.theme.GlassBorderSubtle
+import com.boom.harmix.ui.theme.GlassCardBrush
 import com.boom.harmix.ui.theme.GlassFill
+import com.boom.harmix.ui.theme.GlassFillStrong
 import com.boom.harmix.ui.theme.GlassFillSubtle
+import com.boom.harmix.ui.theme.GlassSpecularBorder
 import com.boom.harmix.ui.theme.Ivory
 import com.boom.harmix.ui.theme.PureBlack
 import com.boom.harmix.ui.theme.Slate
@@ -151,7 +155,7 @@ fun SectionTitle(
     }
 }
 
-/** Sleek minimal glass card with subtle border and smoked Charcoal backdrop. */
+/** Sleek minimal glass card with specular light catch, dual sheen, and frosted backdrop. */
 @Composable
 fun GlassCard(
     modifier: Modifier = Modifier,
@@ -163,12 +167,8 @@ fun GlassCard(
         modifier = modifier
             .fillMaxWidth()
             .clip(shape)
-            .background(
-                Brush.verticalGradient(
-                    listOf(Charcoal.copy(alpha = 0.80f), Charcoal.copy(alpha = 0.60f))
-                )
-            )
-            .border(BorderStroke(1.dp, GlassBorder), shape)
+            .background(GlassCardBrush)
+            .border(BorderStroke(1.dp, GlassSpecularBorder), shape)
             .let { if (onClick != null) it.clickable(onClick = onClick) else it }
             .padding(18.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
@@ -202,7 +202,7 @@ fun GoldPillButton(
     }
 }
 
-/** Outlined glass pill button for secondary actions. */
+/** Outlined glass pill button with specular rim and frosted translucency. */
 @Composable
 fun GhostPillButton(
     text: String,
@@ -215,7 +215,7 @@ fun GhostPillButton(
             .height(46.dp)
             .clip(CircleShape)
             .background(GlassFill)
-            .border(BorderStroke(1.dp, GlassBorder), CircleShape)
+            .border(BorderStroke(1.dp, GlassSpecularBorder), CircleShape)
             .clickable(onClick = onClick)
             .padding(horizontal = 22.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -236,15 +236,17 @@ fun HarmixChip(text: String, selected: Boolean, onClick: () -> Unit) {
             .clip(CircleShape)
             .then(
                 if (selected) Modifier.background(Ivory)
-                else Modifier.background(GlassFillSubtle).border(1.dp, GlassBorderSubtle, CircleShape)
+                else Modifier
+                    .background(GlassFill)
+                    .border(BorderStroke(1.dp, GlassSpecularBorder), CircleShape)
             )
             .clickable(onClick = onClick)
             .padding(horizontal = 16.dp, vertical = 8.dp)
     ) {
         Text(
             text = text,
-            color = if (selected) PureBlack else SoftGrey,
-            fontWeight = if (selected) FontWeight.Black else FontWeight.Medium,
+            color = if (selected) PureBlack else Ivory,
+            fontWeight = if (selected) FontWeight.Black else FontWeight.SemiBold,
             fontSize = 13.sp
         )
     }

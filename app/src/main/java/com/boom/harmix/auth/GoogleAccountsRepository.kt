@@ -94,20 +94,71 @@ class GoogleAccountsRepository @Inject constructor(
         return client.signInIntent
     }
 
+    /** Get the signing certificate SHA-1 fingerprint of the installed APK. */
+    fun getAppCertificateSha1(): String {
+        return try {
+            val packageInfo = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
+                context.packageManager.getPackageInfo(context.packageName, android.content.pm.PackageManager.GET_SIGNING_CERTIFICATES)
+            } else {
+                @Suppress("DEPRECATION")
+                context.packageManager.getPackageInfo(context.packageName, android.content.pm.PackageManager.GET_SIGNATURES)
+            }
+            val signatures = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
+                packageInfo.signingInfo?.apkContentsSigners
+            } else {
+                @Suppress("DEPRECATION")
+                packageInfo.signatures
+            }
+            val cert = signatures?.firstOrNull()?.toByteArray() ?: return "Unknown"
+            val md = java.security.MessageDigest.getInstance("SHA-1")
+            val digest = md.digest(cert)
+            digest.joinToString(":") { "%02X".format(it) }
+        } catch (e: Throwable) {
+            "Could not read certificate: ${e.message}"
+        }
+    }
+
     /** Feed the Activity result back in here and establish Firebase auth for MAIN. */
     suspend fun handleSignInResult(slot: AccountSlot, data: Intent?): GoogleAccountInfo? {
-        val account = runCatching {
-            GoogleSignIn.getSignedInAccountFromIntent(data).getResult(
-                com.google.android.gms.common.api.ApiException::class.java
-            )
-        }.getOrNull() ?: return null
+        if (data == null) {
+            _authError.value = "Sign-in cancelled or no intent data received."
+            return null
+        }
 
-        val email = account.email ?: return null
+        val task = GoogleSignIn.getSignedInAccountFromIntent(data)
+        val account = try {
+            task.getResult(com.google.android.gms.common.api.ApiException::class.java)
+        } catch (e: com.google.android.gms.common.api.ApiException) {
+            Log.e(TAG, "Google sign-in ApiException code: ${e.statusCode}, message: ${e.message}", e)
+            val currentSha1 = getAppCertificateSha1()
+            val errorMsg = when (e.statusCode) {
+                10 -> "Developer Error (code 10): SHA-1 Fingerprint Mismatch!\n\n" +
+                      "Your APK's SHA-1 fingerprint is:\n$currentSha1\n\n" +
+                      "Please add this fingerprint in Firebase Console -> Project Settings -> com.boom.harmix."
+                12500 -> "Sign-in failed (code 12500). Please ensure Google Play Services is updated and Google Sign-In is enabled in Firebase Console."
+                12501 -> "Sign-in cancelled."
+                7 -> "Network error (code 7). Please check your internet connection."
+                else -> "Google sign-in failed (code ${e.statusCode}): ${e.message}"
+            }
+            _authError.value = errorMsg
+            return null
+        } catch (e: Throwable) {
+            Log.e(TAG, "Unexpected sign-in error", e)
+            _authError.value = "Sign-in error: ${e.message}"
+            return null
+        }
+
+        val email = account.email
+        if (email.isNullOrBlank()) {
+            _authError.value = "Google account did not provide an email address."
+            return null
+        }
+
         _authError.value = null
         if (slot == AccountSlot.MAIN) {
             val idToken = account.idToken
             if (idToken.isNullOrBlank()) {
-                _authError.value = "Google didn't return an ID token. Check Firebase Google Sign-In setup."
+                _authError.value = "Google didn't return an ID token. Verify Web Client ID ($WEB_CLIENT_ID) in Firebase Google Sign-In."
                 return null
             }
             val auth = firebaseAuth

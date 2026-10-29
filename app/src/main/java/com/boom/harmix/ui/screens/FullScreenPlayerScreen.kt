@@ -61,6 +61,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.BorderStroke
 import com.boom.harmix.metadata.LyricsResult
 import com.boom.harmix.playback.QueueItemUi
 import com.boom.harmix.ui.components.Artwork
@@ -69,7 +70,9 @@ import com.boom.harmix.ui.theme.Bone
 import com.boom.harmix.ui.theme.Charcoal
 import com.boom.harmix.ui.theme.EmberRed
 import com.boom.harmix.ui.theme.GlassBorder
+import com.boom.harmix.ui.theme.GlassCardBrush
 import com.boom.harmix.ui.theme.GlassFill
+import com.boom.harmix.ui.theme.GlassSpecularBorder
 import com.boom.harmix.ui.theme.Ivory
 import com.boom.harmix.ui.theme.MidnightBlack
 import com.boom.harmix.ui.theme.PureBlack
@@ -231,129 +234,141 @@ fun FullScreenPlayerScreen(
                     .fillMaxWidth()
                     .aspectRatio(1f)
                     .padding(top = 12.dp)
-                    .border(1.dp, GlassBorder, RoundedCornerShape(28.dp))
+                    .border(BorderStroke(1.dp, GlassSpecularBorder), RoundedCornerShape(28.dp))
             )
 
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(top = 22.dp),
-                verticalAlignment = Alignment.CenterVertically
+            // Frosted Glass Controls Deck
+            val deckShape = RoundedCornerShape(28.dp)
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 20.dp)
+                    .clip(deckShape)
+                    .background(GlassCardBrush)
+                    .border(BorderStroke(1.dp, GlassSpecularBorder), deckShape)
+                    .padding(18.dp)
             ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = songTitle,
-                        color = Bone,
-                        style = MaterialTheme.typography.headlineSmall,
-                        fontWeight = FontWeight.Black,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    Text(
-                        text = artist.ifBlank { "Unknown artist" },
-                        color = Sand,
-                        style = MaterialTheme.typography.bodyMedium,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.padding(top = 4.dp)
-                    )
-                }
-                if (!isGuest) {
-                    IconButton(onClick = onToggleLike) {
-                        Icon(
-                            imageVector = if (isLiked) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
-                            contentDescription = if (isLiked) "Remove from liked songs" else "Add to liked songs",
-                            tint = if (isLiked) SunsetGold else Sand
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = songTitle,
+                            color = Bone,
+                            style = MaterialTheme.typography.headlineSmall,
+                            fontWeight = FontWeight.Black,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Text(
+                            text = artist.ifBlank { "Unknown artist" },
+                            color = Sand,
+                            style = MaterialTheme.typography.bodyMedium,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.padding(top = 4.dp)
                         )
                     }
-                }
-            }
-
-            val sliderPosition = if (isDragging) dragPositionMs else currentPositionMs.toFloat()
-            val sliderMax = durationMs.coerceAtLeast(1L).toFloat()
-
-            Slider(
-                value = sliderPosition.coerceIn(0f, sliderMax),
-                onValueChange = { isDragging = true; dragPositionMs = it },
-                onValueChangeFinished = { onSeekTo(dragPositionMs.toLong()); isDragging = false },
-                valueRange = 0f..sliderMax,
-                colors = SliderDefaults.colors(
-                    thumbColor = Ivory,
-                    activeTrackColor = Ivory,
-                    inactiveTrackColor = Slate.copy(alpha = 0.35f)
-                ),
-                modifier = Modifier.padding(top = 14.dp)
-            )
-
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text(formatMillis(sliderPosition.toLong()), color = SoftGrey, style = MaterialTheme.typography.labelSmall)
-                Text(formatMillis(durationMs), color = SoftGrey, style = MaterialTheme.typography.labelSmall)
-            }
-
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(top = 20.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                IconButton(onClick = onToggleShuffle) {
-                    Icon(
-                        Icons.Filled.Shuffle,
-                        contentDescription = "Shuffle",
-                        tint = if (isShuffleOn) Ivory else Slate
-                    )
-                }
-                IconButton(onClick = onSkipPrevious, enabled = canSkipPrevious) {
-                    Icon(
-                        Icons.Filled.SkipPrevious,
-                        contentDescription = "Previous",
-                        tint = if (canSkipPrevious) Ivory else Slate.copy(alpha = 0.4f),
-                        modifier = Modifier.size(34.dp)
-                    )
+                    if (!isGuest) {
+                        IconButton(onClick = onToggleLike) {
+                            Icon(
+                                imageVector = if (isLiked) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
+                                contentDescription = if (isLiked) "Remove from liked songs" else "Add to liked songs",
+                                tint = if (isLiked) SunsetGold else Sand
+                            )
+                        }
+                    }
                 }
 
-                Box(
-                    modifier = Modifier
-                        .size(70.dp)
-                        .clip(CircleShape)
-                        .background(Ivory)
-                        .clickable(enabled = !(isBuffering && !isPlaying), onClick = onPlayPauseClick),
-                    contentAlignment = Alignment.Center
+                val sliderPosition = if (isDragging) dragPositionMs else currentPositionMs.toFloat()
+                val sliderMax = durationMs.coerceAtLeast(1L).toFloat()
+
+                Slider(
+                    value = sliderPosition.coerceIn(0f, sliderMax),
+                    onValueChange = { isDragging = true; dragPositionMs = it },
+                    onValueChangeFinished = { onSeekTo(dragPositionMs.toLong()); isDragging = false },
+                    valueRange = 0f..sliderMax,
+                    colors = SliderDefaults.colors(
+                        thumbColor = Ivory,
+                        activeTrackColor = Ivory,
+                        inactiveTrackColor = Slate.copy(alpha = 0.35f)
+                    ),
+                    modifier = Modifier.padding(top = 10.dp)
+                )
+
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text(formatMillis(sliderPosition.toLong()), color = SoftGrey, style = MaterialTheme.typography.labelSmall)
+                    Text(formatMillis(durationMs), color = SoftGrey, style = MaterialTheme.typography.labelSmall)
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(top = 16.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    if (isBuffering && !isPlaying) {
-                        CircularProgressIndicator(
-                            color = PureBlack,
-                            strokeWidth = 3.dp,
-                            modifier = Modifier.size(26.dp)
-                        )
-                    } else {
+                    IconButton(onClick = onToggleShuffle) {
                         Icon(
-                            imageVector = if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-                            contentDescription = if (isPlaying) "Pause" else "Play",
-                            tint = PureBlack,
+                            Icons.Filled.Shuffle,
+                            contentDescription = "Shuffle",
+                            tint = if (isShuffleOn) Ivory else Slate
+                        )
+                    }
+                    IconButton(onClick = onSkipPrevious, enabled = canSkipPrevious) {
+                        Icon(
+                            Icons.Filled.SkipPrevious,
+                            contentDescription = "Previous",
+                            tint = if (canSkipPrevious) Ivory else Slate.copy(alpha = 0.4f),
                             modifier = Modifier.size(34.dp)
                         )
                     }
-                }
 
-                IconButton(onClick = onSkipNext, enabled = canSkipNext) {
-                    Icon(
-                        Icons.Filled.SkipNext,
-                        contentDescription = "Next",
-                        tint = if (canSkipNext) Ivory else Slate.copy(alpha = 0.4f),
-                        modifier = Modifier.size(34.dp)
-                    )
-                }
-                IconButton(onClick = onCycleRepeat) {
-                    Icon(
-                        imageVector = if (repeatMode == REPEAT_ONE) Icons.Filled.RepeatOne else Icons.Filled.Repeat,
-                        contentDescription = "Repeat",
-                        tint = if (repeatMode == REPEAT_OFF) Slate else Ivory
-                    )
+                    Box(
+                        modifier = Modifier
+                            .size(70.dp)
+                            .clip(CircleShape)
+                            .background(Ivory)
+                            .clickable(enabled = !(isBuffering && !isPlaying), onClick = onPlayPauseClick),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        if (isBuffering && !isPlaying) {
+                            CircularProgressIndicator(
+                                color = PureBlack,
+                                strokeWidth = 3.dp,
+                                modifier = Modifier.size(26.dp)
+                            )
+                        } else {
+                            Icon(
+                                imageVector = if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                                contentDescription = if (isPlaying) "Pause" else "Play",
+                                tint = PureBlack,
+                                modifier = Modifier.size(34.dp)
+                            )
+                        }
+                    }
+
+                    IconButton(onClick = onSkipNext, enabled = canSkipNext) {
+                        Icon(
+                            Icons.Filled.SkipNext,
+                            contentDescription = "Next",
+                            tint = if (canSkipNext) Ivory else Slate.copy(alpha = 0.4f),
+                            modifier = Modifier.size(34.dp)
+                        )
+                    }
+                    IconButton(onClick = onCycleRepeat) {
+                        Icon(
+                            imageVector = if (repeatMode == REPEAT_ONE) Icons.Filled.RepeatOne else Icons.Filled.Repeat,
+                            contentDescription = "Repeat",
+                            tint = if (repeatMode == REPEAT_OFF) Slate else Ivory
+                        )
+                    }
                 }
             }
 
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = 26.dp)
+                    .padding(top = 18.dp)
                     .padding(horizontal = 4.dp),
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
@@ -362,9 +377,9 @@ fun FullScreenPlayerScreen(
                         .weight(1f)
                         .clip(CircleShape)
                         .background(GlassFill)
-                        .border(1.dp, GlassBorder, CircleShape)
+                        .border(BorderStroke(1.dp, GlassSpecularBorder), CircleShape)
                         .clickable { showQueueSheet = true }
-                        .padding(vertical = 11.dp),
+                        .padding(vertical = 12.dp),
                     contentAlignment = Alignment.Center
                 ) {
                     Text("Up next", color = Ivory, fontWeight = FontWeight.Bold, fontSize = 13.sp)
@@ -374,12 +389,12 @@ fun FullScreenPlayerScreen(
                         .weight(1f)
                         .clip(CircleShape)
                         .background(GlassFill)
-                        .border(1.dp, GlassBorder, CircleShape)
+                        .border(BorderStroke(1.dp, GlassSpecularBorder), CircleShape)
                         .clickable {
                             showLyricsSheet = true
                             onLyricsClick()
                         }
-                        .padding(vertical = 11.dp),
+                        .padding(vertical = 12.dp),
                     contentAlignment = Alignment.Center
                 ) {
                     Text("Lyrics", color = Ivory, fontWeight = FontWeight.Bold, fontSize = 13.sp)
