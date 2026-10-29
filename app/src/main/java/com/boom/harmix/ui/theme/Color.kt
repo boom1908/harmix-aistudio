@@ -44,6 +44,18 @@ val GlassFloatingBarBrush: Brush = Brush.verticalGradient(
     1.0f to Color(0xCE181818)  // Translucent dark base
 )
 
+val GlassTabPillBrush: Brush = Brush.verticalGradient(
+    0.0f to Color(0x44FAF7F0), // 27% ivory top specular sheen
+    0.35f to Color(0x22FAF7F0), // 13% ivory translucent body
+    1.0f to Color(0x14FAF7F0)  // 8% ivory soft bottom glow
+)
+
+val GlassTabPillBorder: Brush = Brush.verticalGradient(
+    0.0f to Color(0x88FAF7F0), // 53% crisp specular light edge
+    0.45f to Color(0x35FAF7F0), // 21% translucent side outline
+    1.0f to Color(0x14FAF7F0)  // 8% delicate lower rim
+)
+
 val GlassGlowBrush: Brush = Brush.radialGradient(
     listOf(Color(0x30FAF7F0), Color(0x00FAF7F0))
 )

@@ -60,8 +60,12 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import com.boom.harmix.navigation.HarmixDestination
 import com.boom.harmix.ui.components.Artwork
 import com.boom.harmix.ui.components.OfflineBanner
 import com.boom.harmix.ui.components.SleepTimerBanner
@@ -72,6 +76,8 @@ import com.boom.harmix.ui.theme.GlassCharcoal
 import com.boom.harmix.ui.theme.GlassFill
 import com.boom.harmix.ui.theme.GlassFloatingBarBrush
 import com.boom.harmix.ui.theme.GlassSpecularBorder
+import com.boom.harmix.ui.theme.GlassTabPillBorder
+import com.boom.harmix.ui.theme.GlassTabPillBrush
 import com.boom.harmix.ui.theme.Ivory
 import com.boom.harmix.ui.theme.PureBlack
 import com.boom.harmix.ui.theme.Slate
@@ -353,15 +359,31 @@ private fun HarmixBottomBar(
     val currentDestination = navBackStackEntry?.destination
     val shape = RoundedCornerShape(26.dp)
 
-    val selectedIndex = items.indexOfFirst { destination ->
-        currentDestination?.hierarchy?.any { it.route == destination.route } == true
-    }.let { if (it >= 0) it else 0 }
+    // Map subroutes to parent tabs so that navigating to a playlist or account subscreen
+    // doesn't cause the bottom bar indicator to reset or jump to Home
+    val currentRoute = currentDestination?.route
+    val activeTabRoute = when {
+        currentRoute == null -> null
+        currentRoute.startsWith("playlist") -> HarmixDestination.Library.route
+        currentRoute == "listening-history" || currentRoute == "settings" -> HarmixDestination.Account.route
+        items.any { it.route == currentRoute } -> currentRoute
+        else -> null
+    }
 
+    var selectedIndex by rememberSaveable { mutableIntStateOf(0) }
+    if (activeTabRoute != null) {
+        val found = items.indexOfFirst { it.route == activeTabRoute }
+        if (found >= 0) {
+            selectedIndex = found
+        }
+    }
+
+    // Silky smooth sliding indicator with fast-out slow-in easing (280ms duration)
     val animatedIndex by animateFloatAsState(
         targetValue = selectedIndex.toFloat(),
-        animationSpec = spring(
-            dampingRatio = 0.76f,
-            stiffness = 380f
+        animationSpec = tween(
+            durationMillis = 280,
+            easing = FastOutSlowInEasing
         ),
         label = "tab_slide"
     )
@@ -378,7 +400,7 @@ private fun HarmixBottomBar(
     ) {
         val tabWidth = maxWidth / items.size
 
-        // Smooth sliding frosted glass pill indicator behind active tab
+        // Translucent frosted glass pill indicator with specular border
         Box(
             modifier = Modifier
                 .offset(x = tabWidth * animatedIndex)
@@ -386,15 +408,8 @@ private fun HarmixBottomBar(
                 .fillMaxHeight()
                 .padding(horizontal = 6.dp, vertical = 3.dp)
                 .clip(RoundedCornerShape(18.dp))
-                .background(
-                    androidx.compose.ui.graphics.Brush.verticalGradient(
-                        listOf(
-                            Ivory,
-                            SoftGrey
-                        )
-                    )
-                )
-                .border(BorderStroke(1.dp, GlassSpecularBorder), RoundedCornerShape(18.dp))
+                .background(GlassTabPillBrush)
+                .border(BorderStroke(1.dp, GlassTabPillBorder), RoundedCornerShape(18.dp))
         )
 
         Row(
@@ -405,11 +420,13 @@ private fun HarmixBottomBar(
             items.forEachIndexed { index, destination ->
                 val selected = selectedIndex == index
                 val textColor by animateColorAsState(
-                    targetValue = if (selected) PureBlack else SoftGrey.copy(alpha = 0.85f),
+                    targetValue = if (selected) Ivory else SoftGrey.copy(alpha = 0.50f),
+                    animationSpec = tween(durationMillis = 200),
                     label = "tab_text_color"
                 )
                 val iconTint by animateColorAsState(
-                    targetValue = if (selected) PureBlack else SoftGrey.copy(alpha = 0.85f),
+                    targetValue = if (selected) Ivory else SoftGrey.copy(alpha = 0.50f),
+                    animationSpec = tween(durationMillis = 200),
                     label = "tab_icon_color"
                 )
 
@@ -439,7 +456,7 @@ private fun HarmixBottomBar(
                         text = destination.label,
                         color = textColor,
                         style = MaterialTheme.typography.labelSmall,
-                        fontWeight = if (selected) FontWeight.Black else FontWeight.Medium,
+                        fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.padding(top = 2.dp)
