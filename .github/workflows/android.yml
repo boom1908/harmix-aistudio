@@ -53,6 +53,21 @@ jobs:
             keytool -genkey -v -keystore debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
           fi
 
+      - name: Verify google-services.json
+        env:
+          GOOGLE_SERVICES_JSON_SECRET: ${{ secrets.GOOGLE_SERVICES_JSON }}
+        run: |
+          if [ ! -f app/google-services.json ]; then
+            if [ -n "$GOOGLE_SERVICES_JSON_SECRET" ]; then
+              echo "Restoring app/google-services.json from GOOGLE_SERVICES_JSON secret..."
+              echo "$GOOGLE_SERVICES_JSON_SECRET" > app/google-services.json
+            else
+              echo "::error file=app/google-services.json::app/google-services.json is missing! Because missingGoogleServicesStrategy=ERROR, Gradle will fail. Please commit app/google-services.json or add GOOGLE_SERVICES_JSON to GitHub Repository Secrets."
+            fi
+          else
+            echo "app/google-services.json is present."
+          fi
+
       - name: Build Debug APK
         run: ./gradlew assembleDebug --no-daemon
 

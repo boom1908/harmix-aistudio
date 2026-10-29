@@ -3,7 +3,6 @@ package com.boom.harmix.auth
 import android.content.Context
 import android.util.Log
 import com.google.firebase.FirebaseApp
-import com.google.firebase.FirebaseOptions
 
 object FirebaseInitializer {
     private const val TAG = "HarmixFirebase"
@@ -15,26 +14,24 @@ object FirebaseInitializer {
                 return
             }
 
-            // 1. Try standard automatic initialization from resources
+            // Standard automatic initialization from google-services.json generated resources
             val defaultApp = FirebaseApp.initializeApp(context)
             if (defaultApp != null) {
-                Log.i(TAG, "FirebaseApp initialized from resources")
-                return
+                Log.i(TAG, "FirebaseApp initialized successfully from google-services.json resources")
+            } else {
+                Log.e(
+                    TAG,
+                    "FATAL CONFIG ERROR: FirebaseApp.initializeApp(context) returned null! " +
+                    "Ensure 'app/google-services.json' is present in your build repository."
+                )
             }
-
-            // 2. Fallback to explicit configuration from harmix project
-            val options = FirebaseOptions.Builder()
-                .setApplicationId("1:308449061407:android:ab5abc6b0ba5464bab032a")
-                .setApiKey("AIzaSyBEFcJR8J1ILby3ypnXlcoD3pDLzVWN7WY")
-                .setProjectId("harmix-504905")
-                .setStorageBucket("harmix-504905.firebasestorage.app")
-                .setGcmSenderId("308449061407")
-                .build()
-
-            FirebaseApp.initializeApp(context.applicationContext ?: context, options)
-            Log.i(TAG, "FirebaseApp successfully initialized with explicit fallback options")
         } catch (e: Throwable) {
-            Log.e(TAG, "FirebaseApp initialization error: ${e.message}", e)
+            Log.e(
+                TAG,
+                "FATAL CONFIG ERROR: Failed to initialize FirebaseApp: ${e.message}. " +
+                "Ensure 'app/google-services.json' is present and valid.",
+                e
+            )
         }
     }
 }

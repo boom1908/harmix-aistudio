@@ -49,8 +49,26 @@ sealed class UsernameSaveResult {
  */
 @Singleton
 class UserSessionRepository @Inject constructor() {
-    private val auth by lazy { runCatching { FirebaseAuth.getInstance() }.getOrNull() }
-    private val firestore by lazy { runCatching { FirebaseFirestore.getInstance() }.getOrNull() }
+    private val auth by lazy {
+        runCatching { FirebaseAuth.getInstance() }.getOrElse { error ->
+            android.util.Log.e(
+                "UserSessionRepository",
+                "CRITICAL: FirebaseAuth.getInstance() failed: ${error.message}. Is app/google-services.json included in the build?",
+                error
+            )
+            null
+        }
+    }
+    private val firestore by lazy {
+        runCatching { FirebaseFirestore.getInstance() }.getOrElse { error ->
+            android.util.Log.e(
+                "UserSessionRepository",
+                "CRITICAL: FirebaseFirestore.getInstance() failed: ${error.message}. Is app/google-services.json included in the build?",
+                error
+            )
+            null
+        }
+    }
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     private val _session = MutableStateFlow<UserSession>(UserSession.Loading)
@@ -63,10 +81,15 @@ class UserSessionRepository @Inject constructor() {
                 currentAuth.addAuthStateListener { firebaseAuth ->
                     scope.launch { resolve(firebaseAuth.currentUser) }
                 }
-            }.onFailure {
+            }.onFailure { e ->
+                android.util.Log.e("UserSessionRepository", "AuthStateListener failed: ${e.message}", e)
                 _session.value = UserSession.Guest
             }
         } else {
+            android.util.Log.e(
+                "UserSessionRepository",
+                "Firebase is uninitialized. Running in offline/guest mode because app/google-services.json was not packaged."
+            )
             _session.value = UserSession.Guest
         }
     }
