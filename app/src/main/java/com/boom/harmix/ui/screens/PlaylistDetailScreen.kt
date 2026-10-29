@@ -46,15 +46,22 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.boom.harmix.extractor.StreamItem
+import androidx.compose.foundation.BorderStroke
+import com.boom.harmix.ui.components.Artwork
 import com.boom.harmix.ui.components.EmptyState
 import com.boom.harmix.ui.components.GhostPillButton
 import com.boom.harmix.ui.components.GoldPillButton
 import com.boom.harmix.ui.components.TrackRow
 import com.boom.harmix.ui.theme.Bone
+import com.boom.harmix.ui.theme.Charcoal
 import com.boom.harmix.ui.theme.EmberRed
 import com.boom.harmix.ui.theme.GlassBorder
+import com.boom.harmix.ui.theme.GlassSpecularBorder
+import com.boom.harmix.ui.theme.Ivory
 import com.boom.harmix.ui.theme.MidnightBlack
+import com.boom.harmix.ui.theme.PureBlack
 import com.boom.harmix.ui.theme.Sand
+import com.boom.harmix.ui.theme.SoftGrey
 import com.boom.harmix.ui.theme.SunsetGold
 import com.boom.harmix.ui.viewmodel.PlaylistDetailViewModel
 
@@ -95,24 +102,42 @@ fun PlaylistDetailScreen(
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
+                    val firstArtwork = songs.firstOrNull()?.thumbnailUrl
                     Box(
                         modifier = Modifier
                             .size(170.dp)
                             .clip(RoundedCornerShape(26.dp))
-                            .background(Brush.linearGradient(listOf(SunsetGold.copy(alpha = .45f), EmberRed.copy(alpha = .5f), MidnightBlack)))
-                            .border(1.dp, GlassBorder, RoundedCornerShape(26.dp)),
+                            .background(
+                                Brush.verticalGradient(
+                                    listOf(
+                                        Ivory.copy(alpha = 0.24f),
+                                        Charcoal.copy(alpha = 0.85f),
+                                        PureBlack
+                                    )
+                                )
+                            )
+                            .border(BorderStroke(1.dp, GlassSpecularBorder), RoundedCornerShape(26.dp)),
                         contentAlignment = Alignment.Center
                     ) {
-                        Icon(
-                            Icons.Filled.LibraryMusic,
-                            contentDescription = null,
-                            tint = SunsetGold,
-                            modifier = Modifier.size(52.dp)
-                        )
+                        if (!firstArtwork.isNullOrBlank()) {
+                            Artwork(
+                                url = firstArtwork,
+                                contentDescription = playlist?.name,
+                                shape = RoundedCornerShape(26.dp),
+                                modifier = Modifier.fillMaxSize()
+                            )
+                        } else {
+                            Icon(
+                                Icons.Filled.LibraryMusic,
+                                contentDescription = null,
+                                tint = Ivory,
+                                modifier = Modifier.size(54.dp)
+                            )
+                        }
                     }
                     Text(
                         text = playlist?.name ?: "Playlist",
-                        color = SunsetGold,
+                        color = Ivory,
                         style = MaterialTheme.typography.headlineSmall,
                         fontWeight = FontWeight.Black,
                         textAlign = TextAlign.Center,
@@ -122,7 +147,7 @@ fun PlaylistDetailScreen(
                     )
                     Text(
                         text = "${songs.size} songs",
-                        color = Sand,
+                        color = SoftGrey,
                         style = MaterialTheme.typography.bodySmall,
                         modifier = Modifier.padding(top = 4.dp)
                     )

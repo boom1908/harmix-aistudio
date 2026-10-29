@@ -53,9 +53,18 @@ import com.boom.harmix.navigation.HarmixNavHost
 import com.boom.harmix.navigation.bottomNavItemsFor
 import com.boom.harmix.playback.QueueItemUi
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.ui.graphics.Brush
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import com.boom.harmix.ui.components.Artwork
 import com.boom.harmix.ui.components.OfflineBanner
+import com.boom.harmix.ui.components.SleepTimerBanner
 import com.boom.harmix.ui.theme.Charcoal
 import com.boom.harmix.ui.theme.CharcoalSurface
 import com.boom.harmix.ui.theme.GlassBorder
@@ -150,8 +159,20 @@ fun MainScreen(
         Scaffold(
             containerColor = Color.Transparent,
             topBar = {
-                if (!isOnline) {
-                    OfflineBanner(onRetry = { networkViewModel.recheck() })
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .statusBarsPadding()
+                ) {
+                    if (!isOnline) {
+                        OfflineBanner(onRetry = { networkViewModel.recheck() })
+                    }
+                    if (sleepTimerActive && sleepTimerRemainingMs > 0) {
+                        SleepTimerBanner(
+                            remainingMs = sleepTimerRemainingMs,
+                            onCancel = onCancelSleepTimer
+                        )
+                    }
                 }
             },
             bottomBar = {
@@ -332,58 +353,98 @@ private fun HarmixBottomBar(
     val currentDestination = navBackStackEntry?.destination
     val shape = RoundedCornerShape(26.dp)
 
-    Row(
+    val selectedIndex = items.indexOfFirst { destination ->
+        currentDestination?.hierarchy?.any { it.route == destination.route } == true
+    }.let { if (it >= 0) it else 0 }
+
+    val animatedIndex by animateFloatAsState(
+        targetValue = selectedIndex.toFloat(),
+        animationSpec = spring(
+            dampingRatio = 0.76f,
+            stiffness = 380f
+        ),
+        label = "tab_slide"
+    )
+
+    BoxWithConstraints(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 14.dp, vertical = 4.dp)
-            .height(66.dp)
+            .height(68.dp)
             .clip(shape)
             .background(GlassFloatingBarBrush)
             .border(BorderStroke(1.dp, GlassSpecularBorder), shape)
-            .padding(horizontal = 6.dp, vertical = 6.dp),
-        horizontalArrangement = Arrangement.SpaceEvenly,
-        verticalAlignment = Alignment.CenterVertically
+            .padding(horizontal = 6.dp, vertical = 5.dp)
     ) {
-        items.forEach { destination ->
-            val selected = currentDestination?.hierarchy?.any { it.route == destination.route } == true
-            Column(
-                modifier = Modifier
-                    .weight(1f)
-                    .clip(RoundedCornerShape(18.dp))
-                    .clickable {
-                        navController.navigate(destination.route) {
-                            popUpTo(navController.graph.findStartDestination().id) { saveState = true }
-                            launchSingleTop = true
-                            restoreState = true
-                        }
-                    }
-                    .padding(vertical = 4.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Box(
+        val tabWidth = maxWidth / items.size
+
+        // Smooth sliding frosted glass pill indicator behind active tab
+        Box(
+            modifier = Modifier
+                .offset(x = tabWidth * animatedIndex)
+                .width(tabWidth)
+                .fillMaxHeight()
+                .padding(horizontal = 6.dp, vertical = 3.dp)
+                .clip(RoundedCornerShape(18.dp))
+                .background(
+                    androidx.compose.ui.graphics.Brush.verticalGradient(
+                        listOf(
+                            Ivory,
+                            SoftGrey
+                        )
+                    )
+                )
+                .border(BorderStroke(1.dp, GlassSpecularBorder), RoundedCornerShape(18.dp))
+        )
+
+        Row(
+            modifier = Modifier.fillMaxSize(),
+            horizontalArrangement = Arrangement.SpaceEvenly,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            items.forEachIndexed { index, destination ->
+                val selected = selectedIndex == index
+                val textColor by animateColorAsState(
+                    targetValue = if (selected) PureBlack else SoftGrey.copy(alpha = 0.85f),
+                    label = "tab_text_color"
+                )
+                val iconTint by animateColorAsState(
+                    targetValue = if (selected) PureBlack else SoftGrey.copy(alpha = 0.85f),
+                    label = "tab_icon_color"
+                )
+
+                Column(
                     modifier = Modifier
-                        .height(30.dp)
-                        .clip(CircleShape)
-                        .then(if (selected) Modifier.background(Ivory) else Modifier)
-                        .padding(horizontal = 16.dp),
-                    contentAlignment = Alignment.Center
+                        .weight(1f)
+                        .fillMaxHeight()
+                        .clip(RoundedCornerShape(18.dp))
+                        .clickable {
+                            navController.navigate(destination.route) {
+                                popUpTo(navController.graph.findStartDestination().id) { saveState = true }
+                                launchSingleTop = true
+                                restoreState = true
+                            }
+                        }
+                        .padding(vertical = 4.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
                 ) {
                     Icon(
                         destination.icon,
                         contentDescription = destination.label,
-                        tint = if (selected) PureBlack else Slate,
+                        tint = iconTint,
                         modifier = Modifier.size(20.dp)
                     )
+                    Text(
+                        text = destination.label,
+                        color = textColor,
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = if (selected) FontWeight.Black else FontWeight.Medium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.padding(top = 2.dp)
+                    )
                 }
-                Text(
-                    text = destination.label,
-                    color = if (selected) Ivory else Slate,
-                    style = MaterialTheme.typography.labelSmall,
-                    fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.padding(top = 3.dp)
-                )
             }
         }
     }

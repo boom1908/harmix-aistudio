@@ -128,6 +128,17 @@ fun FullScreenPlayerScreen(
     val scrollState = rememberScrollState()
     val dismissThresholdPx = with(LocalDensity.current) { 120.dp.toPx() }
 
+    androidx.activity.compose.BackHandler(enabled = true) {
+        when {
+            showQueueSheet -> showQueueSheet = false
+            showLyricsSheet -> showLyricsSheet = false
+            showPlayerMenu -> showPlayerMenu = false
+            showSleepTimerSheet -> showSleepTimerSheet = false
+            showPlaybackSpeedSheet -> showPlaybackSpeedSheet = false
+            else -> onCollapse()
+        }
+    }
+
     Box(
         modifier = Modifier
             .fillMaxSize()

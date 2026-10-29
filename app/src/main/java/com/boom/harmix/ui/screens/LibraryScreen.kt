@@ -149,11 +149,12 @@ fun LibraryScreen(
 @Composable
 private fun PlaylistCard(playlist: PlaylistUi, onClick: () -> Unit) {
     val shape = RoundedCornerShape(20.dp)
+    val firstArtwork = playlist.songs.firstOrNull()?.thumbnailUrl
     Column(
         modifier = Modifier
             .clip(shape)
-            .background(GlassFill)
-            .border(1.dp, GlassBorder, shape)
+            .background(com.boom.harmix.ui.theme.GlassCardBrush)
+            .border(androidx.compose.foundation.BorderStroke(1.dp, com.boom.harmix.ui.theme.GlassSpecularBorder), shape)
             .clickable(onClick = onClick)
             .padding(12.dp)
     ) {
@@ -162,19 +163,37 @@ private fun PlaylistCard(playlist: PlaylistUi, onClick: () -> Unit) {
                 .fillMaxWidth()
                 .aspectRatio(1f)
                 .clip(RoundedCornerShape(16.dp))
-                .background(Brush.linearGradient(listOf(EmberRed.copy(alpha = .55f), MidnightBlack))),
+                .background(
+                    Brush.verticalGradient(
+                        listOf(
+                            com.boom.harmix.ui.theme.Ivory.copy(alpha = 0.22f),
+                            com.boom.harmix.ui.theme.Charcoal.copy(alpha = 0.85f),
+                            com.boom.harmix.ui.theme.PureBlack
+                        )
+                    )
+                )
+                .border(androidx.compose.foundation.BorderStroke(1.dp, com.boom.harmix.ui.theme.GlassSpecularBorder), RoundedCornerShape(16.dp)),
             contentAlignment = Alignment.Center
         ) {
-            Icon(
-                Icons.Filled.LibraryMusic,
-                contentDescription = playlist.name,
-                tint = com.boom.harmix.ui.theme.SunsetGold,
-                modifier = Modifier.size(34.dp)
-            )
+            if (!firstArtwork.isNullOrBlank()) {
+                com.boom.harmix.ui.components.Artwork(
+                    url = firstArtwork,
+                    contentDescription = playlist.name,
+                    shape = RoundedCornerShape(16.dp),
+                    modifier = Modifier.fillMaxSize()
+                )
+            } else {
+                Icon(
+                    Icons.Filled.LibraryMusic,
+                    contentDescription = playlist.name,
+                    tint = com.boom.harmix.ui.theme.Ivory,
+                    modifier = Modifier.size(36.dp)
+                )
+            }
         }
         Text(
             text = playlist.name,
-            color = Bone,
+            color = com.boom.harmix.ui.theme.Ivory,
             style = MaterialTheme.typography.bodyMedium,
             fontWeight = FontWeight.SemiBold,
             maxLines = 1,
@@ -183,7 +202,7 @@ private fun PlaylistCard(playlist: PlaylistUi, onClick: () -> Unit) {
         )
         Text(
             text = "${playlist.songs.size} songs",
-            color = Sand,
+            color = com.boom.harmix.ui.theme.SoftGrey,
             style = MaterialTheme.typography.bodySmall
         )
     }
