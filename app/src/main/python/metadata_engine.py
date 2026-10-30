@@ -55,60 +55,178 @@ def _entry_to_item(entry):
     video_id = entry.get("videoId")
     if not video_id:
         return None
+    # Check if item is an official album track or from a Topic/verified channel
+    album = entry.get("album")
+    has_album = bool(album and isinstance(album, dict) and album.get("name"))
+    artists = entry.get("artists") or []
+    is_topic = any("topic" in (a.get("name") or "").lower() for a in artists)
+    result_type = entry.get("resultType") or ""
+    category = entry.get("category") or ""
+    
     return {
         "videoId": video_id,
         "title": entry.get("title", "Unknown title"),
-        "artist": _artist_name(entry.get("artists")) or (entry.get("author") or ""),
+        "artist": _artist_name(artists) or (entry.get("author") or ""),
         "thumbnailUrl": _thumbnail_url(entry.get("thumbnails") or entry.get("thumbnail") or []),
         "durationSeconds": _duration_seconds(entry),
+        "_hasAlbum": has_album,
+        "_isTopic": is_topic,
+        "_resultType": result_type,
+        "_isTopResult": category.lower() == "top result" or entry.get("isTopResult") is True,
     }
+
+def _clean_comparison_text(value):
+    """Strip noise tags like (Official Audio), [HD], (Visualizer) for clean title matching."""
+    val = value or ""
+    val = re.sub(r"\((official\s*(audio|music\s*video|video|visualizer|lyric\s*video|lyrics|hd|4k)?|audio|video|lyrics)\)", "", val, flags=re.I)
+    val = re.sub(r"\[(official\s*(audio|music\s*video|video|visualizer|lyric\s*video|lyrics|hd|4k)?|audio|video|lyrics|hd|4k)\]", "", val, flags=re.I)
+    return _normalized_search_text(val)
 
 def _normalized_search_text(value):
     # Keep Unicode letters so Hindi and other non-Latin searches are ranked
     # instead of collapsing to an empty query.
     return re.sub(r"[^\w]+", " ", (value or "").lower(), flags=re.UNICODE).strip()
 
+# Keywords that indicate derivative, lame, or secondary uploads unless explicitly queried
+_NOISE_KEYWORDS = {
+    # Heavy penalty: user rarely wants these when searching a song title
+    "cover": 55,
+    "parody": 60,
+    "karaoke": 55,
+    "instrumental": 50,
+    "tribute": 55,
+    "slowed": 50,
+    "reverb": 45,
+    "nightcore": 55,
+    "8d": 50,
+    "bass boosted": 50,
+    "bassboosted": 50,
+    "pitch shifted": 50,
+    "chipmunk": 60,
+    # Medium penalty: unofficial re-uploads or alternate styles
+    "remix": 35,
+    "acoustic cover": 55,
+    "fingerstyle": 45,
+    "tutorial": 60,
+    "guitar lesson": 60,
+    "reaction": 65,
+    "status": 40,
+    "short": 40,
+    "shorts": 40,
+    "1 hour": 50,
+    "1hour": 50,
+    "loop": 40,
+}
+
 def _score(item, query, position, source_bonus):
-    """Rank the way a person would expect from typing the same words on YouTube."""
+    """
+    Rank items to prioritize original releases and verified master tracks over
+    fan-made re-uploads, covers, and derivatives.
+    """
+    raw_q = (query or "").lower().strip()
     q = _normalized_search_text(query)
     tokens = [t for t in q.split() if t]
-    title = _normalized_search_text(item["title"])
-    artist = _normalized_search_text(item["artist"])
+    
+    raw_title = item.get("title", "")
+    raw_artist = item.get("artist", "")
+    title = _normalized_search_text(raw_title)
+    clean_title = _clean_comparison_text(raw_title)
+    artist = _normalized_search_text(raw_artist)
     haystack = (title + " " + artist).strip()
+    clean_haystack = (clean_title + " " + artist).strip()
 
     score = source_bonus
-    if q and q in title:
-        score += 70
-    elif q and q in haystack:
-        score += 45
-    if q and title.startswith(q):
+
+    # 1. YouTube Music Native Top Result bonus
+    if item.get("_isTopResult") or (position == 0 and source_bonus == 35):
+        score += 65
+
+    # 2. Official audio track bonus (presence of album, Topic channel, or 'song' resultType)
+    if item.get("_hasAlbum"):
+        score += 40
+    if item.get("_isTopic"):
+        score += 35
+    if item.get("_resultType") == "song":
         score += 30
-    title_matches = sum(1 for t in tokens if t in title)
-    matched = sum(1 for t in tokens if t in haystack)
-    score += 18 * title_matches
-    if tokens:
-        score += 35 * (matched / len(tokens))
-        if matched == len(tokens):
-            score += 18
-    # Prefer real tracks over hour-long mixes / 20-second clips.
+
+    # 3. Exact Query & Clean Title Matching
+    # Check if user query matches the clean title (ignoring "(Official Video)" etc.)
+    if q:
+        if q == clean_title:
+            # Absolute exact title match
+            score += 100
+        elif clean_title.startswith(q):
+            score += 60
+        elif q in clean_title:
+            score += 45
+        elif q in clean_haystack:
+            score += 35
+
+    # 4. Smart Title + Artist Disambiguation
+    # If the user typed "Ed Sheeran Shape of You", matching artist + song title separately
+    # should give maximum relevance without needing the song title to repeat the artist's name
+    if artist and tokens:
+        artist_tokens = [t for t in artist.split() if t]
+        matched_artist = sum(1 for t in tokens if t in artist_tokens or t in artist)
+        matched_title = sum(1 for t in tokens if t in clean_title)
+        if matched_artist > 0 and matched_title > 0:
+            # Query contains components of both artist name AND song title!
+            score += 55 + (20 * min(matched_artist, 2)) + (20 * min(matched_title, 3))
+        else:
+            # General token matching
+            score += 18 * matched_title
+            matched_total = sum(1 for t in tokens if t in haystack)
+            score += 25 * (matched_total / len(tokens))
+            if matched_total == len(tokens):
+                score += 20
+    elif tokens:
+        matched_total = sum(1 for t in tokens if t in haystack)
+        score += 30 * (matched_total / len(tokens))
+
+    # 5. Noise & Derivative Penalties (Covers, Slowed+Reverb, Nightcore, Karaoke, etc.)
+    title_lower = raw_title.lower()
+    for noise_kw, penalty in _NOISE_KEYWORDS.items():
+        if noise_kw in title_lower and noise_kw not in raw_q:
+            score -= penalty
+
+    # Extra penalty for obvious cover artists in title/uploader
+    if ("cover by" in title_lower or "ft. cover" in title_lower or "by cover" in title_lower) and "cover" not in raw_q:
+        score -= 50
+
+    # 6. Song duration heuristics: Standard songs are typically 90s - 480s (1.5 - 8 mins)
     duration = item.get("durationSeconds") or 0
-    if 60 <= duration <= 900:
-        score += 12
-    elif duration > 2400:
-        score -= 20
-    # Keep each provider's own ordering as a tiebreaker.
-    score -= position * 0.35
+    if 90 <= duration <= 420:
+        score += 15
+    elif 60 <= duration <= 600:
+        score += 5
+    elif duration > 0 and duration < 50:
+        # Extremely short snippet/preview
+        score -= 35
+    elif duration > 1200:
+        # >20 minutes (likely full album, mix, or loop)
+        score -= 40
+    elif duration > 600:
+        # Extended or multi-song compilation
+        score -= 15
+
+    # 7. Position penalty as a tiebreaker for equal-relevance items
+    score -= position * 0.4
     return score
 
 def search_songs(query: str, limit: int = 20) -> str:
     """
-    Search songs, videos and the "top result" shelf together, then merge and
-    re-rank so the list matches what the same keywords return on YouTube.
+    Search songs, videos and the YouTube Music "top result" shelf, then merge
+    and re-rank to prioritize authentic, original tracks over covers and derivatives.
     """
     limit = max(1, min(int(limit), 50))
     fetch_limit = min(max(limit * 2, 25), 50)
     buckets = []
-    for filter_name, bonus in (("songs", 22), ("videos", 8), (None, 14)):
+    
+    # Run searches across 3 distinct filters:
+    # 1. "songs" filter -> YouTube Music official studio masters
+    # 2. None filter -> Main YouTube Music search with "Top result" card
+    # 3. "videos" filter -> Music videos (used as complement, lower baseline)
+    for filter_name, bonus in (("songs", 35), (None, 30), ("videos", 12)):
         try:
             if filter_name:
                 results = _ytmusic.search(query, filter=filter_name, limit=fetch_limit)
@@ -132,8 +250,12 @@ def search_songs(query: str, limit: int = 20) -> str:
                 item["_score"] = score
                 merged[item["videoId"]] = item
             else:
-                # Appearing in several shelves is itself a relevance signal.
-                existing["_score"] = max(existing["_score"], score) + 10
+                # Appearing in both official songs shelf AND top results is a very strong signal
+                existing["_score"] = max(existing["_score"], score) + 20
+                if item.get("_hasAlbum"):
+                    existing["_hasAlbum"] = True
+                if item.get("_isTopic"):
+                    existing["_isTopic"] = True
                 if not existing.get("durationSeconds"):
                     existing["durationSeconds"] = item.get("durationSeconds")
                 if not existing.get("artist"):
@@ -142,6 +264,10 @@ def search_songs(query: str, limit: int = 20) -> str:
     ranked = sorted(merged.values(), key=lambda i: i["_score"], reverse=True)[:limit]
     for item in ranked:
         item.pop("_score", None)
+        item.pop("_hasAlbum", None)
+        item.pop("_isTopic", None)
+        item.pop("_resultType", None)
+        item.pop("_isTopResult", None)
     return json.dumps(ranked)
 
 def get_trending(limit: int = 15) -> str:
