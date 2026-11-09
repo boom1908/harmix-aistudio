@@ -19,11 +19,19 @@ import javax.inject.Inject
 import com.boom.harmix.HarmixApplication
 import kotlinx.coroutines.delay
 
+data class ArtistUi(
+    val name: String,
+    val avatarUrl: String? = null
+)
+
 sealed class HomeUiState {
     data object Loading : HomeUiState()
     data class Success(
         val items: List<StreamItem>,
-        val forYou: List<StreamItem> = emptyList()
+        val forYou: List<StreamItem> = emptyList(),
+        val dailyMix: List<StreamItem> = emptyList(),
+        val topArtists: List<ArtistUi> = emptyList(),
+        val recentPlaylists: List<com.boom.harmix.data.local.PlaylistUi> = emptyList()
     ) : HomeUiState()
     data class Error(val message: String, val offline: Boolean = false) : HomeUiState()
 }
@@ -58,7 +66,7 @@ class HomeViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.value = HomeUiState.Loading
             try {
-                // Wait for the background Python engine initialization (up to 12s on cold install)
+                // Wait for background Python engine initialization (up to 12s on cold install)
                 var elapsedMs = 0L
                 while (!HarmixApplication.isReady && HarmixApplication.startupError == null && elapsedMs < 12_000L) {
                     delay(250)
@@ -71,39 +79,83 @@ class HomeViewModel @Inject constructor(
                 }
 
                 val trending = metadataRepository.getTrending()
-                val forYou = if (authenticated != null) {
-                    loadForYou(authenticated.uid)
+                if (authenticated != null) {
+                    val uid = authenticated.uid
+                    val liked = libraryRepository.getLikedSongs().first()
+                    val history = listeningHistoryRepository.getRecentHistory(uid).first()
+                    val userPlaylists = libraryRepository.getPlaylists().first()
+
+                    // Extract personalized artist seeds
+                    val artistFrequencies = (liked.map { it.uploader } + history.map { it.song.uploader })
+                        .map { it.trim() }
+                        .filter { it.isNotBlank() }
+                        .groupBy { it.lowercase() }
+                        .entries
+                        .sortedByDescending { it.value.size }
+
+                    val artistNames = artistFrequencies.map { it.value.first() }
+
+                    // Daily Mix with calendar date seed (YYYY-MM-DD)
+                    val dateSeed = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US).format(java.util.Date())
+                    val dailyMix = metadataRepository.getDailyMix(artistNames, dateSeed, limit = 20)
+
+                    // For You tracks (fallback / quick picks)
+                    val forYou = if (artistNames.isNotEmpty()) {
+                        metadataRepository.getForYou(artistNames.take(5), limit = 16)
+                    } else {
+                        emptyList()
+                    }
+
+                    // Top artists for the bottom shelf
+                    val topArtists = artistNames.take(10).map { name ->
+                        // Grab avatar from liked/history song if available
+                        val avatar = (liked.firstOrNull { it.uploader.equals(name, ignoreCase = true) }
+                            ?: history.firstOrNull { it.song.uploader.equals(name, ignoreCase = true) }?.song)?.thumbnailUrl
+                        ArtistUi(name = name, avatarUrl = avatar)
+                    }
+
+                    // Side stack playlists: Liked Songs at #1, plus user playlists
+                    val sidePlaylists = mutableListOf<com.boom.harmix.data.local.PlaylistUi>()
+                    if (liked.isNotEmpty()) {
+                        sidePlaylists.add(
+                            com.boom.harmix.data.local.PlaylistUi(
+                                id = -1L,
+                                name = "Liked songs",
+                                songs = liked
+                            )
+                        )
+                    }
+                    sidePlaylists.addAll(userPlaylists.take(3))
+
+                    _uiState.value = HomeUiState.Success(
+                        items = trending,
+                        forYou = forYou.ifEmpty { trending },
+                        dailyMix = dailyMix.ifEmpty { trending.take(16) },
+                        topArtists = topArtists,
+                        recentPlaylists = sidePlaylists.take(3)
+                    )
                 } else {
-                    emptyList()
-                }
-                _uiState.value = if (trending.isEmpty()) {
-                    HomeUiState.Error("YouTube Music returned no trending tracks")
-                } else {
-                    HomeUiState.Success(trending, forYou)
+                    _uiState.value = if (trending.isEmpty()) {
+                        HomeUiState.Error("YouTube Music returned no trending tracks")
+                    } else {
+                        HomeUiState.Success(trending)
+                    }
                 }
             } catch (e: com.boom.harmix.core.OfflineException) {
                 _uiState.value = HomeUiState.Error(e.message ?: "You're offline.", offline = true)
             } catch (e: Exception) {
-                _uiState.value = HomeUiState.Error(e.message ?: "Unknown error fetching trending tracks")
+                _uiState.value = HomeUiState.Error(e.message ?: "Unknown error fetching recommendations")
             }
         }
     }
 
-    private suspend fun loadForYou(uid: String): List<StreamItem> {
-        val liked = libraryRepository.getLikedSongs().first()
-        val history = listeningHistoryRepository.getRecentHistory(uid).first()
-        val artistNames = (liked.map { it.uploader } + history.map { it.song.uploader })
-            .map { it.trim() }
-            .filter { it.isNotBlank() }
-            .groupBy { it.lowercase() }
-            .entries
-            .sortedByDescending { it.value.size }
-            .take(5)
-            .map { it.value.first() }
-        return if (artistNames.isEmpty()) {
-            emptyList()
-        } else {
-            metadataRepository.getForYou(artistNames, limit = 12)
+    fun savePlaylist(name: String, songs: List<StreamItem>, onSaved: (Long) -> Unit = {}) {
+        viewModelScope.launch {
+            val playlistId = libraryRepository.createPlaylist(name)
+            songs.forEach { song ->
+                libraryRepository.addSongToPlaylistIfAbsent(playlistId, song)
+            }
+            onSaved(playlistId)
         }
     }
 }

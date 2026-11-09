@@ -62,6 +62,7 @@ fun HarmixNavHost(
     onToggleLike: (StreamItem) -> Unit,
     onOpenSettings: () -> Unit,
     onOpenListeningHistory: () -> Unit,
+    metadataRepository: com.boom.harmix.metadata.MetadataRepository? = null,
     modifier: Modifier = Modifier
 ) {
     NavHost(
@@ -74,11 +75,20 @@ fun HarmixNavHost(
                 isGuest = isGuest,
                 username = username,
                 onItemClick = playTrack,
+                onPlayQueue = onPlayQueue,
                 onPlayNext = onPlayNext,
                 onAddToQueue = onAddToQueue,
                 onAddToPlaylistRequest = onAddToPlaylistRequest,
                 likedUrls = likedUrls,
-                onToggleLike = onToggleLike
+                onToggleLike = onToggleLike,
+                onOpenPlaylist = { playlistId ->
+                    if (playlistId > 0) navController.navigate("playlist/$playlistId")
+                    else navController.navigate(HarmixDestination.Library.route)
+                },
+                onOpenArtist = { artistName ->
+                    val encoded = java.net.URLEncoder.encode(artistName, "UTF-8")
+                    navController.navigate("artist/$encoded")
+                }
             )
         }
         composable(HarmixDestination.Search.route) {
@@ -111,6 +121,25 @@ fun HarmixNavHost(
                     onBack = { navController.popBackStack() },
                     onPlayQueue = onPlayQueue,
                     onAddToQueue = onAddToQueue
+                )
+            }
+        }
+        composable(
+            route = "artist/{artistName}",
+            arguments = listOf(navArgument("artistName") { type = NavType.StringType })
+        ) { backStackEntry ->
+            val rawName = backStackEntry.arguments?.getString("artistName").orEmpty()
+            val decodedName = runCatching { java.net.URLDecoder.decode(rawName, "UTF-8") }.getOrDefault(rawName)
+            if (metadataRepository != null) {
+                com.boom.harmix.ui.screens.ArtistTopTracksScreen(
+                    artistName = decodedName,
+                    metadataRepository = metadataRepository,
+                    onBack = { navController.popBackStack() },
+                    onPlayQueue = onPlayQueue,
+                    onAddToQueue = onAddToQueue,
+                    onSaveToPlaylist = { name, songs ->
+                        // Add songs to new playlist
+                    }
                 )
             }
         }

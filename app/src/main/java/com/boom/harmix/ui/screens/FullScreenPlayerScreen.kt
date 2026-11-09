@@ -110,6 +110,7 @@ fun FullScreenPlayerScreen(
     onQueueItemClick: (index: Int) -> Unit,
     onQueueItemRemove: (index: Int) -> Unit,
     onLyricsClick: () -> Unit,
+    onSelectLyricsProvider: (String) -> Unit = {},
     playbackSpeed: Float,
     onPlaybackSpeedChange: (Float) -> Unit,
     onSetSleepTimer: (durationMs: Long?, endOfCurrentTrack: Boolean) -> Unit,
@@ -429,6 +430,7 @@ fun FullScreenPlayerScreen(
         LyricsBottomSheet(
             lyricsResult = lyricsResult,
             currentPositionMs = currentPositionMs,
+            onSelectProvider = onSelectLyricsProvider,
             onDismiss = { showLyricsSheet = false }
         )
     }

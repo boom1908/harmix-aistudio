@@ -227,13 +227,15 @@ class MainActivity : ComponentActivity() {
                         currentTrackForPlaylist = currentStreamItemOrNull(),
                         lyricsResult = lyricsResult,
                         onRetrySession = userSessionRepository::refresh,
-                        onLyricsClick = ::fetchLyricsForCurrentTrack,
+                        onLyricsClick = { fetchLyricsForCurrentTrack("auto") },
+                        onSelectLyricsProvider = { provider -> fetchLyricsForCurrentTrack(provider) },
                         playbackSpeed = playbackSpeed,
                         onPlaybackSpeedChange = ::applyPlaybackSpeed,
                         onSetSleepTimer = ::setSleepTimer,
                         sleepTimerActive = sleepTimerDeadlineMs != null || sleepAtEndOfTrackUrl != null,
                         sleepTimerRemainingMs = sleepTimerRemainingMs,
-                        onCancelSleepTimer = ::cancelSleepTimer
+                        onCancelSleepTimer = ::cancelSleepTimer,
+                        metadataRepository = metadataRepository
                     )
 
                     crashDialogContent?.let { crashText ->
@@ -672,9 +674,18 @@ class MainActivity : ComponentActivity() {
 
     private fun extractVideoId(url: String): String? = runCatching { Uri.parse(url).getQueryParameter("v") }.getOrNull()
     private fun currentStreamItemOrNull(): StreamItem? = currentTrackUrl?.let { StreamItem(title = currentSongTitle, url = it, thumbnailUrl = currentArtworkUrl, uploader = currentArtist) }
-    private fun fetchLyricsForCurrentTrack() {
+    private fun fetchLyricsForCurrentTrack(provider: String = "auto") {
         lyricsResult = null
-        lifecycleScope.launch { lyricsResult = metadataRepository.getLyrics(currentSongTitle, currentArtist, (effectiveDurationMs / 1000L).toInt()) }
+        val videoId = currentTrackUrl?.let { extractVideoId(it) }.orEmpty()
+        lifecycleScope.launch {
+            lyricsResult = metadataRepository.getLyrics(
+                title = currentSongTitle,
+                artist = currentArtist,
+                durationSeconds = (effectiveDurationMs / 1000L).toInt(),
+                videoId = videoId,
+                provider = provider
+            )
+        }
     }
 
     private fun applyPlaybackSpeed(speed: Float) {

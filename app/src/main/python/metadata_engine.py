@@ -329,30 +329,211 @@ def get_for_you(artists_json: str, limit: int = 12) -> str:
                 return json.dumps(items)
     return json.dumps(items)
 
-def get_lyrics(title: str, artist: str, duration_seconds: int = 0) -> str:
-    clean_artist = re.sub(r"\s*-\s*Topic$", "", artist).strip()
-    params = {
-        "track_name": title,
-        "artist_name": clean_artist,
-    }
-    if duration_seconds > 0:
-        params["duration"] = duration_seconds
+def get_artist_top_tracks(artist_name: str, limit: int = 25) -> str:
+    """Fetch top studio tracks specifically for an artist."""
+    clean_artist = re.sub(r"\s*-\s*Topic$", "", artist_name).strip()
+    try:
+        results = _ytmusic.search(f"{clean_artist} top songs", filter="songs", limit=limit + 5)
+    except Exception as exc:
+        print(f"[metadata_engine] get_artist_top_tracks failed for {clean_artist!r}: {exc}", flush=True)
+        results = []
+
+    items = []
+    seen = set()
+    for entry in results:
+        item = _entry_to_item(entry)
+        if not item or item["videoId"] in seen:
+            continue
+        seen.add(item["videoId"])
+        # Clean internal scoring attributes before returning
+        item.pop("_hasAlbum", None)
+        item.pop("_isTopic", None)
+        item.pop("_resultType", None)
+        item.pop("_isTopResult", None)
+        items.append(item)
+        if len(items) >= limit:
+            break
+    return json.dumps(items)
+
+def get_daily_mix(artists_json: str, date_seed: str, limit: int = 20) -> str:
+    """
+    Cluster-based Daily Mix generation matching Spotify/YT Music architecture:
+    - Anchors on the user's top affinity artists with a date-based rotation.
+    - Shuffles seed artists uniquely per day (YYYY-MM-DD) so it's strictly different every day.
+    - Blends favorites with discoverable radio tracks from watch playlists.
+    """
+    import hashlib
+    import random
 
     try:
-        response = requests.get(
+        artists = json.loads(artists_json)
+    except (TypeError, json.JSONDecodeError):
+        artists = []
+
+    # If user has no listening history yet, fallback to trending curated tracks
+    if not artists:
+        return get_trending(limit=limit)
+
+    # Deterministic daily shuffle based on user's artists + date string
+    seed_int = int(hashlib.md5(f"{date_seed}_{artists_json}".encode("utf-8")).hexdigest()[:8], 16)
+    rng = random.Random(seed_int)
+
+    shuffled_artists = list(artists)
+    rng.shuffle(shuffled_artists)
+
+    # Pick top 2-3 seed artists for today's specific vibe
+    primary_seeds = shuffled_artists[:3]
+    items = []
+    seen = set()
+
+    for artist in primary_seeds:
+        try:
+            results = _ytmusic.search(f"{artist} songs", filter="songs", limit=7)
+        except Exception:
+            continue
+        for entry in results:
+            item = _entry_to_item(entry)
+            if not item or item["videoId"] in seen:
+                continue
+            seen.add(item["videoId"])
+            items.append(item)
+
+    # If we have at least one anchor track, grab 5-8 related watch playlist songs for discovery
+    if items:
+        anchor_id = items[0]["videoId"]
+        try:
+            watch_res = _ytmusic.get_watch_playlist(videoId=anchor_id, limit=10)
+            for track in watch_res.get("tracks", []):
+                item = _entry_to_item(track)
+                if not item or item["videoId"] in seen:
+                    continue
+                seen.add(item["videoId"])
+                items.append(item)
+                if len(items) >= limit:
+                    break
+        except Exception:
+            pass
+
+    # Shuffle the final mix with the daily seed so track order is smooth and natural
+    rng.shuffle(items)
+
+    final_list = items[:limit]
+    for item in final_list:
+        item.pop("_hasAlbum", None)
+        item.pop("_isTopic", None)
+        item.pop("_resultType", None)
+        item.pop("_isTopResult", None)
+
+    return json.dumps(final_list)
+
+def _fetch_lrclib(title: str, artist: str, duration_seconds: int = 0):
+    clean_artist = re.sub(r"\s*-\s*Topic$", "", artist).strip()
+    params = {"track_name": title, "artist_name": clean_artist}
+    if duration_seconds > 0:
+        params["duration"] = duration_seconds
+    try:
+        res = requests.get(
             "https://lrclib.net/api/get",
             params=params,
             headers={"User-Agent": "Harmix/0.1 (Android app)"},
-            timeout=8,
+            timeout=7,
         )
-        if response.status_code != 200:
-            return json.dumps({"syncedLyrics": None, "plainLyrics": None, "found": False})
-
-        data = response.json()
-        return json.dumps({
-            "syncedLyrics": data.get("syncedLyrics"),
-            "plainLyrics": data.get("plainLyrics"),
-            "found": True,
-        })
+        if res.status_code == 200:
+            data = res.json()
+            return {
+                "syncedLyrics": data.get("syncedLyrics"),
+                "plainLyrics": data.get("plainLyrics"),
+                "provider": "LRCLIB",
+                "found": bool(data.get("syncedLyrics") or data.get("plainLyrics")),
+            }
     except Exception:
-        return json.dumps({"syncedLyrics": None, "plainLyrics": None, "found": False})
+        pass
+    return None
+
+def _fetch_ytmusic_lyrics(video_id: str):
+    if not video_id:
+        return None
+    try:
+        watch = _ytmusic.get_watch_playlist(videoId=video_id)
+        lyrics_browse_id = watch.get("lyrics")
+        if lyrics_browse_id:
+            yt_lyrics = _ytmusic.get_lyrics(lyrics_browse_id)
+            lyrics_text = yt_lyrics.get("lyrics")
+            if lyrics_text:
+                return {
+                    "syncedLyrics": None,
+                    "plainLyrics": lyrics_text,
+                    "provider": "YouTube Music",
+                    "found": True,
+                }
+    except Exception:
+        pass
+    return None
+
+def _fetch_ovh_lyrics(title: str, artist: str):
+    clean_artist = re.sub(r"\s*-\s*Topic$", "", artist).strip()
+    try:
+        res = requests.get(
+            f"https://api.lyrics.ovh/v1/{requests.utils.quote(clean_artist)}/{requests.utils.quote(title)}",
+            headers={"User-Agent": "Harmix/0.1 (Android app)"},
+            timeout=6,
+        )
+        if res.status_code == 200:
+            text = res.json().get("lyrics")
+            if text:
+                return {
+                    "syncedLyrics": None,
+                    "plainLyrics": text.strip(),
+                    "provider": "Lyrics.ovh",
+                    "found": True,
+                }
+    except Exception:
+        pass
+    return None
+
+def get_lyrics(title: str, artist: str, duration_seconds: int = 0, video_id: str = "", provider: str = "auto") -> str:
+    """
+    Multi-provider lyrics engine supporting:
+    - 'lrclib' (synced and plain)
+    - 'ytmusic' (YouTube Music official lyrics)
+    - 'ovh' (Lyrics.ovh fallback catalog)
+    - 'auto' (Tries LRCLIB first, then YTMusic, then OVH)
+    """
+    clean_artist = re.sub(r"\s*-\s*Topic$", "", artist).strip()
+    clean_title = re.sub(r"[\(\[].*?[\)\]]", "", title).strip()
+
+    if provider == "lrclib":
+        res = _fetch_lrclib(clean_title, clean_artist, duration_seconds)
+        if res and res["found"]:
+            return json.dumps(res)
+        return json.dumps({"syncedLyrics": None, "plainLyrics": None, "provider": "LRCLIB", "found": False})
+
+    if provider == "ytmusic":
+        res = _fetch_ytmusic_lyrics(video_id)
+        if res and res["found"]:
+            return json.dumps(res)
+        return json.dumps({"syncedLyrics": None, "plainLyrics": None, "provider": "YouTube Music", "found": False})
+
+    if provider == "ovh":
+        res = _fetch_ovh_lyrics(clean_title, clean_artist)
+        if res and res["found"]:
+            return json.dumps(res)
+        return json.dumps({"syncedLyrics": None, "plainLyrics": None, "provider": "Lyrics.ovh", "found": False})
+
+    # 'auto': Try LRCLIB for synced lyrics first
+    lrclib_res = _fetch_lrclib(clean_title, clean_artist, duration_seconds)
+    if lrclib_res and lrclib_res["found"]:
+        return json.dumps(lrclib_res)
+
+    # Next try YouTube Music official lyrics
+    if video_id:
+        yt_res = _fetch_ytmusic_lyrics(video_id)
+        if yt_res and yt_res["found"]:
+            return json.dumps(yt_res)
+
+    # Finally try Lyrics.ovh
+    ovh_res = _fetch_ovh_lyrics(clean_title, clean_artist)
+    if ovh_res and ovh_res["found"]:
+        return json.dumps(ovh_res)
+
+    return json.dumps({"syncedLyrics": None, "plainLyrics": None, "provider": "None", "found": False})

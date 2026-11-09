@@ -121,6 +121,7 @@ fun MainScreen(
     onQueueItemClick: (index: Int) -> Unit,
     onQueueItemRemove: (index: Int) -> Unit,
     onLyricsClick: () -> Unit,
+    onSelectLyricsProvider: (String) -> Unit = {},
     playbackSpeed: Float,
     onPlaybackSpeedChange: (Float) -> Unit,
     onSetSleepTimer: (durationMs: Long?, endOfCurrentTrack: Boolean) -> Unit,
@@ -133,7 +134,8 @@ fun MainScreen(
     onAddToPlaylistRequest: (StreamItem) -> Unit,
     onDismissPlaylistDialog: () -> Unit,
     onSelectPlaylistForTarget: (playlistId: Long) -> Unit,
-    onCreatePlaylistForTarget: (name: String) -> Unit
+    onCreatePlaylistForTarget: (name: String) -> Unit,
+    metadataRepository: com.boom.harmix.metadata.MetadataRepository? = null
 ) {
     when (val session = sessionState) {
         UserSession.Loading -> {
@@ -219,6 +221,7 @@ fun MainScreen(
                 onToggleLike = onToggleLikeForItem,
                 onOpenSettings = { navController.navigate("settings") },
                 onOpenListeningHistory = { navController.navigate("listening-history") },
+                metadataRepository = metadataRepository,
                 modifier = Modifier.padding(innerPadding)
             )
         }
@@ -257,6 +260,7 @@ fun MainScreen(
                 onQueueItemClick = onQueueItemClick,
                 onQueueItemRemove = onQueueItemRemove,
                 onLyricsClick = onLyricsClick,
+                onSelectLyricsProvider = onSelectLyricsProvider,
                 playbackSpeed = playbackSpeed,
                 onPlaybackSpeedChange = onPlaybackSpeedChange,
                 onSetSleepTimer = onSetSleepTimer,

@@ -13,8 +13,8 @@ import javax.inject.Singleton
 data class LyricLine(val timestampMs: Long, val text: String)
 
 sealed class LyricsResult {
-    data class Synced(val lines: List<LyricLine>) : LyricsResult()
-    data class PlainOnly(val text: String) : LyricsResult()
+    data class Synced(val lines: List<LyricLine>, val provider: String = "LRCLIB") : LyricsResult()
+    data class PlainOnly(val text: String, val provider: String = "Auto") : LyricsResult()
     data object NotFound : LyricsResult()
 }
 
@@ -35,7 +35,19 @@ class MetadataRepository @Inject constructor(
     suspend fun getForYou(artists: List<String>, limit: Int = 12): List<StreamItem> =
         callPython("get_for_you", JSONArray(artists).toString(), limit)
 
-    suspend fun getLyrics(title: String, artist: String, durationSeconds: Int = 0): LyricsResult =
+    suspend fun getDailyMix(artists: List<String>, dateSeed: String, limit: Int = 20): List<StreamItem> =
+        callPython("get_daily_mix", JSONArray(artists).toString(), dateSeed, limit)
+
+    suspend fun getArtistTopTracks(artistName: String, limit: Int = 25): List<StreamItem> =
+        callPython("get_artist_top_tracks", artistName, limit)
+
+    suspend fun getLyrics(
+        title: String,
+        artist: String,
+        durationSeconds: Int = 0,
+        videoId: String = "",
+        provider: String = "auto"
+    ): LyricsResult =
         withContext(Dispatchers.IO) {
             if (!networkMonitor.isOnline()) return@withContext LyricsResult.NotFound
             if (!Python.isStarted()) return@withContext LyricsResult.NotFound
@@ -43,15 +55,23 @@ class MetadataRepository @Inject constructor(
             val metadataModule = python.getModule("metadata_engine")
 
             try {
-                val jsonResult = metadataModule.callAttr("get_lyrics", title, artist, durationSeconds).toString()
+                val jsonResult = metadataModule.callAttr(
+                    "get_lyrics",
+                    title,
+                    artist,
+                    durationSeconds,
+                    videoId,
+                    provider
+                ).toString()
                 val json = org.json.JSONObject(jsonResult)
 
                 val syncedRaw = json.optString("syncedLyrics").takeIf { it.isNotBlank() && it != "null" }
                 val plainRaw = json.optString("plainLyrics").takeIf { it.isNotBlank() && it != "null" }
+                val resolvedProvider = json.optString("provider", "Auto")
 
                 when {
-                    syncedRaw != null -> LyricsResult.Synced(parseLrc(syncedRaw))
-                    plainRaw != null -> LyricsResult.PlainOnly(plainRaw)
+                    syncedRaw != null -> LyricsResult.Synced(parseLrc(syncedRaw), resolvedProvider)
+                    plainRaw != null -> LyricsResult.PlainOnly(plainRaw, resolvedProvider)
                     else -> LyricsResult.NotFound
                 }
             } catch (e: PyException) {
