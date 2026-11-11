@@ -5,7 +5,6 @@ workflows:
     instance_type: linux_x2
     environment:
       java: 17
-      python: "3.11"
     triggering:
       events:
         - push
@@ -22,6 +21,9 @@ workflows:
           elif [ -f debug.keystore.base64 ]; then
             base64 -d debug.keystore.base64 > debug.keystore
           fi
+      - name: Verify Python (Required for Chaquopy)
+        script: |
+          python3 --version || sudo apt-get update && sudo apt-get install -y python3.11 python3-pip
       - name: Build Debug APK
         script: |
           chmod +x gradlew
