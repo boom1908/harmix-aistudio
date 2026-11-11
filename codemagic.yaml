@@ -17,9 +17,9 @@ workflows:
       - name: Setup Keystore
         script: |
           if [ -f harmix-debug.keystore.base64 ]; then
-            base64 -d harmix-debug.keystore.base64 > debug.keystore
+            base64 -D -i harmix-debug.keystore.base64 -o debug.keystore 2>/dev/null || base64 -d harmix-debug.keystore.base64 > debug.keystore 2>/dev/null || base64 --decode harmix-debug.keystore.base64 > debug.keystore
           elif [ -f debug.keystore.base64 ]; then
-            base64 -d debug.keystore.base64 > debug.keystore
+            base64 -D -i debug.keystore.base64 -o debug.keystore 2>/dev/null || base64 -d debug.keystore.base64 > debug.keystore 2>/dev/null || base64 --decode debug.keystore.base64 > debug.keystore
           fi
       - name: Verify Python (Required for Chaquopy)
         script: |
