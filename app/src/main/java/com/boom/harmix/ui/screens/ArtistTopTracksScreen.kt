@@ -24,7 +24,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.BookmarkAdd
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Shuffle
+import com.boom.harmix.ui.components.PlaylistShareDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -71,6 +73,7 @@ fun ArtistTopTracksScreen(
     val context = LocalContext.current
     var songs by remember { mutableStateOf<List<StreamItem>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
+    var showShare by remember { mutableStateOf(false) }
 
     LaunchedEffect(artistName) {
         isLoading = true
@@ -112,6 +115,13 @@ fun ArtistTopTracksScreen(
                 modifier = Modifier.weight(1f).padding(start = 8.dp)
             )
             if (songs.isNotEmpty()) {
+                IconButton(onClick = { showShare = true }) {
+                    Icon(
+                        imageVector = Icons.Filled.Share,
+                        contentDescription = "Share or download playlist",
+                        tint = Ivory
+                    )
+                }
                 IconButton(
                     onClick = {
                         onSaveToPlaylist(artistName, songs)
@@ -181,7 +191,7 @@ fun ArtistTopTracksScreen(
                         color = Sand
                     )
                     Spacer(Modifier.height(16.dp))
-                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                         GoldPillButton(
                             text = "Play All",
                             icon = Icons.Filled.PlayArrow,
@@ -191,6 +201,11 @@ fun ArtistTopTracksScreen(
                             text = "Shuffle",
                             icon = Icons.Filled.Shuffle,
                             onClick = { onPlayQueue(songs.shuffled(), 0) }
+                        )
+                        GhostPillButton(
+                            text = "Share",
+                            icon = Icons.Filled.Share,
+                            onClick = { showShare = true }
                         )
                     }
                 }
@@ -207,5 +222,13 @@ fun ArtistTopTracksScreen(
                 )
             }
         }
+    }
+
+    if (showShare) {
+        PlaylistShareDialog(
+            playlistName = "$artistName Top Tracks",
+            songs = songs,
+            onDismiss = { showShare = false }
+        )
     }
 }

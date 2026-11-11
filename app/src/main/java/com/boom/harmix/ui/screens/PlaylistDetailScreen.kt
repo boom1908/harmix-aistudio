@@ -22,8 +22,10 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.LibraryMusic
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material3.AlertDialog
+import com.boom.harmix.ui.components.PlaylistShareDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -75,6 +77,7 @@ fun PlaylistDetailScreen(
     val playlist by viewModel.playlist.collectAsStateWithLifecycle()
     var showRename by remember { mutableStateOf(false) }
     var showDelete by remember { mutableStateOf(false) }
+    var showShare by remember { mutableStateOf(false) }
     var optionsTarget by remember { mutableStateOf<StreamItem?>(null) }
 
     val songs = playlist?.songs.orEmpty()
@@ -88,6 +91,11 @@ fun PlaylistDetailScreen(
                 Icon(Icons.Filled.ArrowBack, contentDescription = "Back to library", tint = Bone)
             }
             Spacer(Modifier.weight(1f))
+            if (songs.isNotEmpty()) {
+                IconButton(onClick = { showShare = true }) {
+                    Icon(Icons.Filled.Share, contentDescription = "Share or download playlist", tint = Ivory)
+                }
+            }
             IconButton(onClick = { showRename = true }) {
                 Icon(Icons.Filled.Edit, contentDescription = "Rename playlist", tint = Sand)
             }
@@ -160,6 +168,11 @@ fun PlaylistDetailScreen(
                         }
                         GhostPillButton(text = "Shuffle", icon = Icons.Filled.Shuffle) {
                             if (songs.isNotEmpty()) onPlayQueue(songs.shuffled(), 0)
+                        }
+                        if (songs.isNotEmpty()) {
+                            GhostPillButton(text = "Share", icon = Icons.Filled.Share) {
+                                showShare = true
+                            }
                         }
                     }
                 }
@@ -237,6 +250,14 @@ fun PlaylistDetailScreen(
             dismissButton = {
                 TextButton(onClick = { showDelete = false }) { Text("Cancel", color = Sand) }
             }
+        )
+    }
+
+    if (showShare) {
+        PlaylistShareDialog(
+            playlistName = playlist?.name ?: "Playlist",
+            songs = songs,
+            onDismiss = { showShare = false }
         )
     }
 }
