@@ -2,7 +2,7 @@ workflows:
   harmix-android-build:
     name: Build Harmix Android APK
     max_build_duration: 30
-    instance_type: linux_x2
+    instance_type: mac_mini_m2
     environment:
       java: 17
     triggering:
@@ -23,7 +23,7 @@ workflows:
           fi
       - name: Verify Python (Required for Chaquopy)
         script: |
-          python3 --version || sudo apt-get update && sudo apt-get install -y python3.11 python3-pip
+          python3 --version
       - name: Build Debug APK
         script: |
           chmod +x gradlew
